@@ -1,0 +1,147 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Popcorn VLC Sync + Tunnel</title>
+  </head>
+  <body
+    style="
+      font-family: sans-serif;
+      background: #111;
+      color: #fff;
+      padding: 20px;
+      text-align: center;
+    "
+  >
+    <h1>VLC Sync with LocalTunnel</h1>
+    <input id="magnet" placeholder="Magnet URI" style="width: 500px" />
+    <br /><br />
+    <button onclick="startHost()">Start Host</button>
+    <br /><br />
+    <input id="hosturl" placeholder="Paste Invite Code" style="width: 500px" />
+    <button onclick="joinRoom()">Join Room</button>
+    <br /><br />
+    <p id="status">Ready.</p>
+    <div id="tunnel-link" style="margin-top: 10px; color: #8f8"></div>
+    <div id="torrent-status" style="margin-top: 20px; color: #ccc"></div>
+    <div id="video-wrapper">Video will appear here.</div>
+    <script>
+      const { ipcRenderer } = require("electron");
+
+      let isHost = false;
+
+      function startWebsocket(url) {
+        const websocket = new WebSocket(url); // hoofdletter W!
+
+        websocket.onopen = () => {
+          console.log("connected");
+
+          if (isHost) {
+            const intervalID = setInterval(() => {
+              const video = document.getElementById("video");
+              if (video) {
+                websocket.send(
+                  JSON.stringify({
+                    type: "sync",
+                    time: parseFloat(video.currentTime.toFixed(2)),
+                  }),
+                );
+              }
+            }, 2000);
+          }
+        };
+
+        if (!isHost) {
+          websocket.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+
+            const video = document.getElementById("video");
+
+            if (video && !msg.magnet) {
+              console.log(
+                video.currentTime,
+                msg.time,
+                Math.abs(video.currentTime - msg.time),
+              );
+
+              if (Math.abs(video.currentTime - msg.time) > 2) {
+                video.currentTime = msg.time;
+              }
+            }
+            console.log("message:", event.data);
+          };
+        }
+
+        websocket.onerror = (error) => {
+          console.error("WebSocket error:", error);
+        };
+
+        websocket.onclose = () => {
+          console.log("connection closed");
+        };
+      }
+
+      function startHost() {
+        const magnet = document.getElementById("magnet").value.trim();
+        if (!magnet) return alert("Please enter a magnet URI");
+        ipcRenderer.send("start-host", { magnetURI: magnet });
+        document.getElementById("status").textContent = "Starting host...";
+        isHost = true;
+      }
+
+      function joinRoom() {
+        const code = document.getElementById("hosturl").value.trim();
+        if (!code) return alert("Please enter invite code");
+        ipcRenderer.send("join-room", code);
+        document.getElementById("status").textContent =
+          "Joining host tunnel...";
+      }
+
+      ipcRenderer.on("sync-update", (_, data) => {
+        document.getElementById("status").textContent =
+          `Sync: ${data.time?.toFixed?.(1) ?? 0}s | ${data.paused ? "Paused" : "Playing"}`;
+      });
+
+      ipcRenderer.on("torrent-update", (_, data) => {
+        const sizeMB = data.fileSize
+          ? (data.fileSize / (1024 * 1024)).toFixed(1)
+          : "?";
+        const ext = data.fileName
+          ? data.fileName.split(".").pop().toUpperCase()
+          : "?";
+        document.getElementById("torrent-status").textContent =
+          `File: ${data.fileName || "Unknown"} (${ext}, ${sizeMB} MB)
+` +
+          `Downloaded: ${(data.progress * 100).toFixed(1)}% | Peers: ${data.numPeers} | Speed: ${(data.downloadSpeed / 1024).toFixed(1)} KB/s`;
+      });
+
+      ipcRenderer.on("torrent-loaded", (_, data) => {
+        const videowrapper = document.getElementById("video-wrapper");
+        videowrapper.innerHTML = "";
+        const video = document.createElement("video");
+        video.id = "video";
+        video.src = data.publicStreamURL;
+        video.controls = true;
+        video.autoplay = true;
+        video.style.width = "100%";
+        video.style.maxHeight = "100%";
+        videowrapper.appendChild(video);
+      });
+
+      ipcRenderer.on("tunnel-url", (_, data) => {
+        const tunnelDiv = document.getElementById("tunnel-link");
+        tunnelDiv.innerHTML = `
+          Tunnel ready! Share this invite code:<br>
+          <input value="${data.inviteCode}" readonly style="width: 100%; padding: 8px; font-size: 16px" onclick="this.select()" />
+          <br><small style="color:#888;display: none">(${data.raw})</small>`;
+      });
+
+      ipcRenderer.on("start-socket", (_, url) => {
+        startWebsocket(url);
+      });
+
+      ipcRenderer.on("status", (_, message) => {
+        document.getElementById("status").textContent = message;
+      });
+    </script>
+  </body>
+</html>
