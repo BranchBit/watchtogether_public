@@ -76,7 +76,7 @@ app.whenReady().then(async () => {
       <p>
         <a href="https://github.com/zhongfly/mpv-winbuild/releases"
            target="_blank"
-           style="color:#8f8;">Download MPV for Windows</a>
+           style="color:#8f8;">Download and install MPV</a>
       </p>
     </body>
   `));
