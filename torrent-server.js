@@ -21,39 +21,39 @@ async function spawnTorrentServer(magnetURI, port = 8888) {
 
       const isMKV = file.name.toLowerCase().endsWith(".mkv");
 
-      if (isMKV) {
-        console.log(`Transcoding ${file.name} on the fly...`);
-
-        res.writeHead(200, {
-          "Content-Type": "video/mp4",
-          "Transfer-Encoding": "chunked",
-        });
-
-        const stream = file.createReadStream();
-        const ffmpeg = spawn("ffmpeg", [
-          "-i", "pipe:0",
-          "-f", "mp4",
-          "-vcodec", "libx264",
-          "-acodec", "aac",
-          "-movflags", "frag_keyframe+empty_moov+default_base_moof",
-          "-preset", "ultrafast",
-          "pipe:1",
-        ]);
-
-        stream.pipe(ffmpeg.stdin);
-        ffmpeg.stdout.pipe(res);
-
-        ffmpeg.stderr.on("data", (data) => {
-          console.error(`FFmpeg error: ${data}`);
-        });
-
-        res.on("close", () => {
-          console.log("Client disconnected. Killing FFmpeg.");
-          ffmpeg.kill("SIGINT");
-          stream.destroy();
-        });
-
-      } else {
+      // if (isMKV) {
+      //   console.log(`Transcoding ${file.name} on the fly...`);
+      //
+      //   res.writeHead(200, {
+      //     "Content-Type": "video/mp4",
+      //     "Transfer-Encoding": "chunked",
+      //   });
+      //
+      //   const stream = file.createReadStream();
+      //   const ffmpeg = spawn("ffmpeg", [
+      //     "-i", "pipe:0",
+      //     "-f", "mp4",
+      //     "-vcodec", "libx264",
+      //     "-acodec", "aac",
+      //     "-movflags", "frag_keyframe+empty_moov+default_base_moof",
+      //     "-preset", "ultrafast",
+      //     "pipe:1",
+      //   ]);
+      //
+      //   stream.pipe(ffmpeg.stdin);
+      //   ffmpeg.stdout.pipe(res);
+      //
+      //   ffmpeg.stderr.on("data", (data) => {
+      //     console.error(`FFmpeg error: ${data}`);
+      //   });
+      //
+      //   res.on("close", () => {
+      //     console.log("Client disconnected. Killing FFmpeg.");
+      //     ffmpeg.kill("SIGINT");
+      //     stream.destroy();
+      //   });
+      //
+      // } else {
         // Direct stream for mp4 or webm
         const range = req.headers.range;
         const total = file.length;
@@ -105,7 +105,7 @@ async function spawnTorrentServer(magnetURI, port = 8888) {
         });
 
         stream.pipe(res);
-      }
+      // }
     });
 
     app.listen(port, () => {
