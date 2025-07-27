@@ -38,12 +38,19 @@ jobs:
             echo "tag=v$major.$minor.$patch" >> $GITHUB_OUTPUT
           fi
 
-      - name: Tag and push
+      - name: Tag and push (skip if already exists)
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git tag ${{ steps.get_tag.outputs.tag }}
-          git push origin refs/tags/${{ steps.get_tag.outputs.tag }}
+          git fetch --tags
+          tag=${{ steps.get_tag.outputs.tag }}
+          
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "⚠️ Tag $tag already exists. Skipping tag push."
+          else
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git tag "$tag"
+            git push origin "refs/tags/$tag"
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
