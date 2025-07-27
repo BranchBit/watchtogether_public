@@ -92,8 +92,7 @@
         const code = document.getElementById("hosturl").value.trim();
         if (!code) return alert("Please enter invite code");
         ipcRenderer.send("join-room", code);
-        document.getElementById("status").textContent =
-          "Joining host tunnel...";
+        document.getElementById("status").textContent = "Joining host tunnel...";
       }
 
       
@@ -117,17 +116,8 @@
           `Downloaded: ${(data.progress * 100).toFixed(1)}% | Peers: ${data.numPeers} | Speed: ${(data.downloadSpeed / 1024).toFixed(1)} KB/s`;
       });
 
-      ipcRenderer.on("torrent-loaded", (_, data) => {
-        const videowrapper = document.getElementById("video-wrapper");
-        videowrapper.innerHTML = "";
-        const video = document.createElement("video");
-        video.id = "video";
-        video.src = data.publicStreamURL;
-        video.controls = true;
-        video.autoplay = true;
-        video.style.width = "100%";
-        video.style.maxHeight = "100%";
-        videowrapper.appendChild(video);
+      ipcRenderer.on("torrent-loaded", () => {
+        document.getElementById("video-wrapper").innerText = "Playing in mpv player...";
       });
 
       ipcRenderer.on("tunnel-url", (_, data) => {

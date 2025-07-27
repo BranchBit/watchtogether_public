@@ -1,0 +1,44 @@
+{
+  "name": "electron-vlc-localtunnel",
+  "version": "1.0.0",
+  "description": "VLC torrent streamer with sync over localtunnel and Electron GUI",
+  "author": "Sam",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "get-port": "^7.1.0",
+    "localtunnel": "^2.0.2",
+    "node-mpv": "^1.5.0",
+    "vlc-command": "^1.1.1",
+    "webtorrent": "^1.8.0",
+    "ws": "^8.15.0"
+  },
+  "devDependencies": {
+    "electron": "37.2.4",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.example.watchtogether",
+    "productName": "WatchTogether",
+    "files": [
+      "**/*",
+      "!node_modules/.cache"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
