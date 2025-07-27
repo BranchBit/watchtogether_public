@@ -20,6 +20,7 @@ function checkMPVInstalled() {
   });
 }
 
+
 function encodeInviteURL(url) {
   return Buffer.from(url).toString("base64url");
 }
