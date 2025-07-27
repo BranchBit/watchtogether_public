@@ -1,0 +1,38 @@
+name: Auto Tag and Build
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  tag-and-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to push tags
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Fetch all tags
+        run: git fetch --tags
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          latest=$(git tag --sort=-v:refname | grep '^v' | head -n 1)
+          echo "Latest tag: $latest"
+          if [[ -z "$latest" ]]; then
+            echo "tag=v1.0.0" >> $GITHUB_OUTPUT
+          else
+            version=$(echo $latest | sed 's/v//')
+            IFS='.' read -r major minor patch <<< "$version"
+            patch=$((patch + 1))
+            echo "tag=v$major.$minor.$patch" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create new tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.get_tag.outputs.tag }}
+          git push origin ${{ steps.get_tag.outputs.tag }}
