@@ -108,8 +108,9 @@ ipcMain.on("join-room", async (event, code) => {
   const { connectToRoom } = require("./sync-socket");
   win.webContents.send("start-socket", socketURL);
 
-  connectToRoom(socketURL, async (sync) => {
-    if (!sync.magnet) return;
+    let latestSync = {};
+    connectToRoom(socketURL, async (sync) => {
+    latestSync = sync; // 🔥 Keep latest sync object up to date    if (!sync.magnet) return;
     if (clientJoined) return;
     clientJoined = true;
 
@@ -142,10 +143,10 @@ ipcMain.on("join-room", async (event, code) => {
           .then((currentTime) => {
             if (
                 typeof currentTime === "number" &&
-                Math.abs(currentTime - (sync.time || 0)) > 2
+                Math.abs(currentTime - (latestSync.time || 0)) > 2
             ) {
               console.log("🔁 Desync detected, correcting...");
-              clientPlayer.goToPosition(sync.time);
+              clientPlayer.goToPosition(latestSync.time);
             }
           })
           .catch((err) => console.error("MPV sync error (client):", err));
