@@ -5,6 +5,21 @@ const WebSocket = require("ws");
 const localtunnel = require("localtunnel");
 const MPV = require("node-mpv");
 
+
+const { execFile } = require("child_process");
+
+function checkMPVInstalled() {
+  return new Promise((resolve, reject) => {
+    execFile("mpv", ["--version"], (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error("MPV is not installed or not in PATH"));
+      } else {
+        resolve(true);
+      }
+    });
+  });
+}
+
 function encodeInviteURL(url) {
   return Buffer.from(url).toString("base64url");
 }
@@ -32,7 +47,20 @@ function createWindow() {
   win.loadFile("index.html");
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  try {
+    await checkMPVInstalled();
+    createWindow();
+  } catch (err) {
+    console.error("❌", err.message);
+    const { dialog } = require("electron");
+    dialog.showErrorBox(
+        "MPV Player Not Found",
+        "The MPV media player is required to run this app.\n\nPlease install it and make sure it's in your system PATH."
+    );
+    app.quit();
+  }
+});
 
 ipcMain.on("start-host", async (event, { magnetURI }) => {
   const getPort = (await import("get-port")).default;
