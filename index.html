@@ -98,8 +98,9 @@
 
       ipcRenderer.on("sync-update", (_, data) => {
         document.getElementById("status").textContent =
-          `Sync: ${data.time?.toFixed?.(1) ?? 0}s | ${data.paused ? "Paused" : "Playing"}`;
+                document.getElementById("status").textContent = "Host mode active.";
       });
+
 
       ipcRenderer.on("torrent-update", (_, data) => {
         const sizeMB = data.fileSize
