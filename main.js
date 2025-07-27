@@ -4,15 +4,14 @@ const { spawnTorrentServer } = require("./torrent-server");
 const WebSocket = require("ws");
 const localtunnel = require("localtunnel");
 const MPV = require("node-mpv");
-
-
 const { execFile } = require("child_process");
+const os = require("os");
 
 function checkMPVInstalled() {
   return new Promise((resolve, reject) => {
-    execFile("mpv", ["--version"], (error, stdout, stderr) => {
+    execFile("mpv", ["--version"], (error) => {
       if (error) {
-        reject(new Error("MPV is not installed or not in PATH, dl from https://github.com/zhongfly/mpv-winbuild/releases"));
+        reject(new Error("MPV is not installed or not in PATH"));
       } else {
         resolve(true);
       }
@@ -20,6 +19,53 @@ function checkMPVInstalled() {
   });
 }
 
+function getMPVErrorMessage(platform) {
+  switch (platform) {
+    case "win32":
+      return `
+        <h2>MPV Not Found (Windows)</h2>
+        <p>This app needs MPV media player installed and available in your PATH.</p>
+        <p><strong>Recommended:</strong></p>
+        <ul>
+          <li><a href="https://github.com/stax76/mpv.net/releases/latest" style="color:#8f8;" target="_blank">Download mpv.net (GUI version)</a></li>
+          <li>Or: <a href="https://github.com/zhongfly/mpv-winbuild/releases/latest" style="color:#8f8;" target="_blank">Download mpv-winbuild (raw binaries)</a></li>
+        </ul>
+        <p>After installing, restart this app.</p>
+      `;
+
+    case "darwin":
+      return `
+        <h2>MPV Not Found (macOS)</h2>
+        <p>This app requires MPV to be installed.</p>
+        <ul>
+          <li><a href="https://github.com/mpv-player/mpv/releases/latest" style="color:#8f8;" target="_blank">Download latest MPV for macOS</a></li>
+          <li>Or install via Homebrew: <code>brew install mpv</code></li>
+        </ul>
+        <p>After installing, restart this app.</p>
+      `;
+
+    case "linux":
+      return `
+        <h2>MPV Not Found (Linux)</h2>
+        <p>This app requires MPV installed and accessible via PATH.</p>
+        <p>Use your distro’s package manager:</p>
+        <ul>
+          <li>Debian/Ubuntu: <code>sudo apt install mpv</code></li>
+          <li>Fedora: <code>sudo dnf install mpv</code></li>
+          <li>Arch: <code>sudo pacman -S mpv</code></li>
+        </ul>
+        <p>After installing, restart this app.</p>
+      `;
+
+    default:
+      return `
+        <h2>MPV Not Found (Unknown Platform)</h2>
+        <p>This app requires the MPV media player.</p>
+        <p><a href="https://mpv.io/" style="color:#8f8;" target="_blank">Visit mpv.io for instructions</a></p>
+        <p>After installing, restart this app.</p>
+      `;
+  }
+}
 
 function encodeInviteURL(url) {
   return Buffer.from(url).toString("base64url");
@@ -52,34 +98,29 @@ app.whenReady().then(async () => {
   try {
     await checkMPVInstalled();
     createWindow();
-  }catch (err) {
+  } catch (err) {
     console.error("❌", err.message);
-    const { BrowserWindow } = require("electron");
+    const platform = os.platform();
+    const message = getMPVErrorMessage(platform);
 
     const errorWin = new BrowserWindow({
-      width: 500,
-      height: 300,
+      width: 600,
+      height: 400,
       title: "MPV Player Not Found",
       resizable: false,
       minimizable: false,
       maximizable: false,
       webPreferences: {
-        contextIsolation: true,
+        contextIsolation: false,
+        nodeIntegration: true,
       },
     });
 
     errorWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
-    <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
-      <h2>MPV Player Not Found</h2>
-      <p>The MPV media player is required to run this app.</p>
-      <p>Please install it and make sure it's in your system PATH.</p>
-      <p>
-        <a href="https://github.com/zhongfly/mpv-winbuild/releases"
-           target="_blank"
-           style="color:#8f8;">Download and install MPV</a>
-      </p>
-    </body>
-  `));
+      <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+        ${message}
+      </body>
+    `));
 
     errorWin.on("closed", () => {
       app.quit();
@@ -123,7 +164,7 @@ ipcMain.on("start-host", async (event, { magnetURI }) => {
     } catch (err) {
       console.error("❌ Host MPV failed to start:", err);
     }
-  }, 2000); // small delay to ensure stream is up
+  }, 2000);
 
   setInterval(() => {
     hostPlayer.getProperty("time-pos")
@@ -161,10 +202,10 @@ ipcMain.on("join-room", async (event, code) => {
   const { connectToRoom } = require("./sync-socket");
   win.webContents.send("start-socket", socketURL);
 
-    let latestSync = {};
-    connectToRoom(socketURL, async (sync) => {
-    latestSync = sync; // 🔥 Keep latest sync object up to date    if (!sync.magnet) return;
-    if (clientJoined) return;
+  let latestSync = {};
+  connectToRoom(socketURL, async (sync) => {
+    latestSync = sync;
+    if (!sync.magnet || clientJoined) return;
     clientJoined = true;
 
     const getPort = (await import("get-port")).default;
@@ -189,15 +230,12 @@ ipcMain.on("join-room", async (event, code) => {
       } catch (err) {
         console.error("❌ Client MPV failed to start:", err);
       }
-    }, 2000); // small delay to ensure stream is up
+    }, 2000);
 
     setInterval(() => {
       clientPlayer.getProperty("time-pos")
           .then((currentTime) => {
-            if (
-                typeof currentTime === "number" &&
-                Math.abs(currentTime - (latestSync.time || 0)) > 2
-            ) {
+            if (typeof currentTime === "number" && Math.abs(currentTime - (latestSync.time || 0)) > 2) {
               console.log("🔁 Desync detected, correcting...");
               clientPlayer.goToPosition(latestSync.time);
             }
@@ -218,7 +256,6 @@ ipcMain.on("join-room", async (event, code) => {
     win.webContents.send("sync-update", sync);
   });
 });
-
 
 function startWebSocketServer(port) {
   wss = new WebSocket.Server({ port });
@@ -253,4 +290,3 @@ function broadcastSync(payload) {
     }
   });
 }
-
