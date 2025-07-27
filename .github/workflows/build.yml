@@ -2,8 +2,9 @@ name: Build Electron App
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
+    tags:
+      - 'v*'
+  #pull_request:
 
 jobs:
   build-linux:
@@ -88,3 +89,34 @@ jobs:
             dist/*.dmg
             dist/*.app
 
+  release:
+    needs: [ build-linux, build-windows, build-macos ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # required to publish a release
+
+    steps:
+      - name: Download Linux AppImage
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-app
+          path: artifacts
+
+      - name: Download Windows Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: artifacts
+
+      - name: Download macOS App
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-app
+          path: artifacts
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

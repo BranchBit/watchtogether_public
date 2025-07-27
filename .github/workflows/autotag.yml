@@ -1,5 +1,4 @@
-name: Auto Tag and Build
-
+name: Auto Tag on Special Commits
 
 on:
   push:
@@ -7,17 +6,18 @@ on:
 
 jobs:
   tag-and-build:
+    if: contains(github.event.head_commit.message, 'tag')
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Required to push tags
+      contents: write  # Needed to push tag
 
     steps:
       - uses: actions/checkout@v3
 
-      - name: Fetch all tags
+      - name: Fetch tags
         run: git fetch --tags
 
-      - name: Get latest tag
+      - name: Get latest version tag
         id: get_tag
         run: |
           latest=$(git tag --sort=-v:refname | grep '^v' | head -n 1)
@@ -31,7 +31,7 @@ jobs:
             echo "tag=v$major.$minor.$patch" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create new tag
+      - name: Create and push tag
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
