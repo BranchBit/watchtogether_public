@@ -96,6 +96,7 @@
           "Joining host tunnel...";
       }
 
+      
       ipcRenderer.on("sync-update", (_, data) => {
         if (typeof data.time === "number") {
           document.getElementById("status").textContent =
