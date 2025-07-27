@@ -1,122 +1,100 @@
-name: Build Electron App
+name: Auto Tag + Build + Release
 
 on:
   push:
-    tags:
-      - 'v*'
-  #pull_request:
+    branches: [ main ]
 
 jobs:
-  build-linux:
-    env:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  tag-build-release:
+    if: contains(github.event.head_commit.message, 'tag')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Needed to push tag and create release
+
     strategy:
       matrix:
-        node-version: [20]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     steps:
       - uses: actions/checkout@v3
 
-      - name: Use Node.js
+      - name: Fetch tags
+        run: git fetch --tags
+
+      - name: Calculate next version
+        id: get_tag
+        run: |
+          latest=$(git tag --sort=-v:refname | grep '^v' | head -n 1)
+          echo "Latest tag: $latest"
+          if [[ -z "$latest" ]]; then
+            echo "tag=v1.0.0" >> $GITHUB_OUTPUT
+          else
+            version=$(echo $latest | sed 's/v//')
+            IFS='.' read -r major minor patch <<< "$version"
+            patch=$((patch + 1))
+            echo "tag=v$major.$minor.$patch" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Tag and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.get_tag.outputs.tag }}
+          git push origin refs/tags/${{ steps.get_tag.outputs.tag }}
+
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 20
 
-      - name: Install system deps
+      - name: Install system deps (Linux only)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libx11-dev libxkbfile-dev libsecret-1-dev fakeroot rpm libnss3 libxss1 libasound2-dev
 
-      - name: Install npm deps
-        run: npm install
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Build Linux AppImage
-        run: npx electron-builder --linux AppImage
+      - name: Build Electron app
+        run: |
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            npx electron-builder --linux AppImage
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            npx electron-builder --win nsis
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            npx electron-builder --mac
+          fi
 
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux-app
-          path: dist/*.AppImage
-
-  build-windows:
-    env:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 20
-
-      - name: Install npm deps
-        run: npm install
-
-      - name: Build Windows EXE
-        run: npx electron-builder --win nsis
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-installer
-          path: dist/*.exe
-
-  build-macos:
-    env:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 20
-
-      - name: Install npm deps
-        run: npm install
-
-      - name: Build macOS DMG
-        run: npx electron-builder --mac
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-app
+          name: ${{ runner.os }}-artifact
           path: |
+            dist/*.AppImage
+            dist/*.exe
             dist/*.dmg
             dist/*.app
 
   release:
-    needs: [ build-linux, build-windows, build-macos ]
+    needs: tag-build-release
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # required to publish a release
+      contents: write
 
     steps:
-      - name: Download Linux AppImage
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: linux-app
           path: artifacts
 
-      - name: Download Windows Installer
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-installer
-          path: artifacts
-
-      - name: Download macOS App
-        uses: actions/download-artifact@v4
-        with:
-          name: macos-app
-          path: artifacts
-
-      - name: Create GitHub Release and upload assets
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**
+          tag_name: ${{ needs.tag-build-release.outputs.tag }}
+          files: artifacts/**/*  # All binaries
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
