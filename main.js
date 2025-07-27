@@ -12,7 +12,7 @@ function checkMPVInstalled() {
   return new Promise((resolve, reject) => {
     execFile("mpv", ["--version"], (error, stdout, stderr) => {
       if (error) {
-        reject(new Error("MPV is not installed or not in PATH"));
+        reject(new Error("MPV is not installed or not in PATH, dl from https://github.com/zhongfly/mpv-winbuild/releases"));
       } else {
         resolve(true);
       }
@@ -51,14 +51,38 @@ app.whenReady().then(async () => {
   try {
     await checkMPVInstalled();
     createWindow();
-  } catch (err) {
+  }catch (err) {
     console.error("❌", err.message);
-    const { dialog } = require("electron");
-    dialog.showErrorBox(
-        "MPV Player Not Found",
-        "The MPV media player is required to run this app.\n\nPlease install it and make sure it's in your system PATH."
-    );
-    app.quit();
+    const { BrowserWindow } = require("electron");
+
+    const errorWin = new BrowserWindow({
+      width: 500,
+      height: 300,
+      title: "MPV Player Not Found",
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      webPreferences: {
+        contextIsolation: true,
+      },
+    });
+
+    errorWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
+    <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+      <h2>MPV Player Not Found</h2>
+      <p>The MPV media player is required to run this app.</p>
+      <p>Please install it and make sure it's in your system PATH.</p>
+      <p>
+        <a href="https://github.com/zhongfly/mpv-winbuild/releases"
+           target="_blank"
+           style="color:#8f8;">Download MPV for Windows</a>
+      </p>
+    </body>
+  `));
+
+    errorWin.on("closed", () => {
+      app.quit();
+    });
   }
 });
 
