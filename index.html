@@ -97,10 +97,11 @@
       }
 
       ipcRenderer.on("sync-update", (_, data) => {
-        document.getElementById("status").textContent =
-                document.getElementById("status").textContent = "Host mode active.";
+        if (typeof data.time === "number") {
+          document.getElementById("status").textContent =
+                  `Synced to ${data.time.toFixed(1)}s`;
+        }
       });
-
 
       ipcRenderer.on("torrent-update", (_, data) => {
         const sizeMB = data.fileSize
