@@ -147,3 +147,43 @@ jobs:
           files: artifacts/**/*  # Upload everything
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-to-public:
+    needs: release
+    if: needs.create-tag.outputs.tag != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone public repo
+        uses: actions/checkout@v3
+        with:
+          repository: BranchBit/watchtogether_public
+          token: ${{ secrets.GH_TOKEN }}
+          path: public-repo
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+
+      - name: Copy release files to public repo
+        run: |
+          tag=${{ needs.create-tag.outputs.tag }}
+          mkdir -p public-repo/releases/$tag
+          
+          # Copy only binaries (no source code)
+          find all-artifacts -type f \( \
+            -iname '*.exe' -o \
+            -iname '*.AppImage' -o \
+            -iname '*.dmg' -o \
+            -iname '*.zip' -o \
+            -iname '*.app' \
+          \) -exec cp {} public-repo/releases/$tag/ \;
+
+      - name: Commit and push artifacts
+        run: |
+          cd public-repo
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .
+          git commit -m "Release ${{ needs.create-tag.outputs.tag }}"
+          git push origin main
