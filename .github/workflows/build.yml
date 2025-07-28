@@ -176,7 +176,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-public:
-    needs: [release-private, create-tag]
+    needs: [ release-private, create-tag ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -185,23 +185,13 @@ jobs:
       TAG: ${{ needs.create-tag.outputs.tag }}
 
     steps:
-      - name: Checkout private repo
-        uses: actions/checkout@v3
-
-      - name: Push tag and commit to public repo (no source)
+      - name: Clone private repo
         run: |
-          mkdir public-mirror
-          cd public-mirror
-          git init
-          git remote add origin https://x-access-token:${GH_TOKEN}@github.com/BranchBit/watchtogether_public.git
-
-          # Pull commit/tag from private repo
-          git fetch --depth=1 origin $TAG
-
-          # Mirror the tag/commit only
-          git push origin "refs/tags/$TAG"
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          git clone --no-checkout --depth=1 --filter=blob:none --branch main https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/BranchBit/watchtogether.git private
+          cd private
+          git fetch origin refs/tags/${TAG}:refs/tags/${TAG}
+          git remote add public https://x-access-token:${GH_TOKEN}@github.com/BranchBit/watchtogether_public.git
+          git push public refs/tags/${TAG}
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
