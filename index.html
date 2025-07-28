@@ -12,7 +12,7 @@
       text-align: center;
     "
   >
-    <h1>VLC Sync with LocalTunnel</h1>
+    <h1>Watchtogether</h1>
     <input id="magnet" placeholder="Magnet URI" style="width: 500px" />
     <br /><br />
     <button onclick="startHost()">Start Host</button>
@@ -92,14 +92,14 @@
         const code = document.getElementById("hosturl").value.trim();
         if (!code) return alert("Please enter invite code");
         ipcRenderer.send("join-room", code);
-        document.getElementById("status").textContent = "Joining host tunnel...";
+        document.getElementById("status").textContent =
+          "Joining host tunnel...";
       }
 
-      
       ipcRenderer.on("sync-update", (_, data) => {
         if (typeof data.time === "number") {
           document.getElementById("status").textContent =
-                  `Synced to ${data.time.toFixed(1)}s`;
+            `Synced to ${data.time.toFixed(1)}s`;
         }
       });
 
@@ -117,7 +117,8 @@
       });
 
       ipcRenderer.on("torrent-loaded", () => {
-        document.getElementById("video-wrapper").innerText = "Playing in mpv player...";
+        document.getElementById("video-wrapper").innerText =
+          "Playing in mpv player...";
       });
 
       ipcRenderer.on("tunnel-url", (_, data) => {
