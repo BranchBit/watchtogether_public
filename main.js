@@ -192,6 +192,7 @@ ipcMain.on("start-host", async (event, { magnetURI }) => {
 });
 
 let clientJoined = false;
+
 ipcMain.on("join-room", async (event, code) => {
   const socketURL = decodeInviteCode(code);
   if (!socketURL || !socketURL.startsWith("ws")) {
@@ -202,59 +203,70 @@ ipcMain.on("join-room", async (event, code) => {
   win.webContents.send("start-socket", socketURL);
 
   let latestSync = {};
-  connectToRoom(socketURL, async (sync) => {
-    latestSync = sync;
-    if (!sync.magnet || clientJoined) return;
-    clientJoined = true;
 
-    const getPort = (await import("get-port")).default;
-    const torrentPort = await getPort();
-    const { fileName, torrent } = await spawnTorrentServer(sync.magnet, torrentPort);
-    const streamURL = `http://localhost:${torrentPort}/video`;
+  connectToRoom(
+      socketURL,
+      async (sync) => {
+        latestSync = sync;
+        if (!sync.magnet || clientJoined) return;
+        clientJoined = true;
 
-    torrent.on("download", () => updateTorrent(torrent, fileName));
-    torrent.on("done", () => updateTorrent(torrent, fileName));
+        const getPort = (await import("get-port")).default;
+        const torrentPort = await getPort();
+        const { fileName, torrent } = await spawnTorrentServer(sync.magnet, torrentPort);
+        const streamURL = `http://localhost:${torrentPort}/video`;
 
-    const clientPlayer = new MPV({
-      audio_only: false,
-      debug: false,
-      args: ["--force-window=yes", "--idle=yes"],
-    });
+        torrent.on("download", () => updateTorrent(torrent, fileName));
+        torrent.on("done", () => updateTorrent(torrent, fileName));
 
-    setTimeout(async () => {
-      try {
-        await clientPlayer.load(streamURL);
-        await clientPlayer.play();
-        console.log("🎬 Client MPV started playback.");
-      } catch (err) {
-        console.error("❌ Client MPV failed to start:", err);
+        const clientPlayer = new MPV({
+          audio_only: false,
+          debug: false,
+          args: ["--force-window=yes", "--idle=yes"],
+        });
+
+        setTimeout(async () => {
+          try {
+            await clientPlayer.load(streamURL);
+            await clientPlayer.play();
+            console.log("🎬 Client MPV started playback.");
+          } catch (err) {
+            console.error("❌ Client MPV failed to start:", err);
+          }
+        }, 2000);
+
+        setInterval(() => {
+          clientPlayer.getProperty("time-pos")
+              .then((currentTime) => {
+                if (typeof currentTime === "number" && Math.abs(currentTime - (latestSync.time || 0)) > 2) {
+                  console.log("🔁 Desync detected, correcting...");
+                  clientPlayer.goToPosition(latestSync.time);
+                }
+              })
+              .catch((err) => console.error("MPV sync error (client):", err));
+        }, 2000);
+
+        function updateTorrent(t, fileName) {
+          win.webContents.send("torrent-update", {
+            progress: t.progress,
+            numPeers: t.numPeers,
+            downloadSpeed: t.downloadSpeed,
+            fileName,
+            fileSize: t.length,
+          });
+        }
+
+        win.webContents.send("sync-update", sync);
+      },
+      (errMsg) => {
+        // New: notify user of error in UI
+        console.error("Room join error:", errMsg);
+        clientJoined = false;
+        win.webContents.send("status", errMsg);
       }
-    }, 2000);
-
-    setInterval(() => {
-      clientPlayer.getProperty("time-pos")
-          .then((currentTime) => {
-            if (typeof currentTime === "number" && Math.abs(currentTime - (latestSync.time || 0)) > 2) {
-              console.log("🔁 Desync detected, correcting...");
-              clientPlayer.goToPosition(latestSync.time);
-            }
-          })
-          .catch((err) => console.error("MPV sync error (client):", err));
-    }, 2000);
-
-    function updateTorrent(t, fileName) {
-      win.webContents.send("torrent-update", {
-        progress: t.progress,
-        numPeers: t.numPeers,
-        downloadSpeed: t.downloadSpeed,
-        fileName,
-        fileSize: t.length,
-      });
-    }
-
-    win.webContents.send("sync-update", sync);
-  });
+  );
 });
+
 
 function startWebSocketServer(port) {
   wss = new WebSocket.Server({ port });
