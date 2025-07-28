@@ -190,22 +190,15 @@ jobs:
           git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/BranchBit/watchtogether.git private
           cd private
 
-          # Fetch the tag explicitly (in case not cloned by default)
           git fetch origin refs/tags/${TAG}:refs/tags/${TAG}
 
-          # Add the public repo as a remote
           git remote add public https://x-access-token:${GH_TOKEN}@github.com/BranchBit/watchtogether_public.git
 
-          # Push the tag and the commit it points to
           commit=$(git rev-list -n 1 ${TAG})
           git branch temp-release $commit
           git push public temp-release:refs/heads/temp-release
           git push public refs/tags/${TAG}
-
-          # ✅ Delete the branch from the public repo after pushing
           git push public --delete temp-release
-
-          # Clean up local branch
           git branch -D temp-release
 
       - name: Download artifacts
@@ -221,16 +214,16 @@ jobs:
           files: artifacts/**/*.*
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
       - name: Update GitHub Pages release list
         run: |
           git clone https://x-access-token:${GH_TOKEN}@github.com/BranchBit/watchtogether_public.git public-pages
           cd public-pages
 
-          # Fetch tags from public repo (or private if preferred)
           TAGS=$(git tag --sort=-v:refname | grep '^v' | head -n 10 || true)
 
-          # Build release list HTML
           {
+            echo "<!--RELEASE-LIST-->"
             echo "<h3>Releases</h3>"
             echo "<ul class='release-list'>"
             for TAG in $TAGS; do
@@ -239,11 +232,8 @@ jobs:
             echo "</ul>"
           } > release-block.html
 
-          # Print contents for debug
-          echo "🔧 Generated HTML block:"
-          cat release-block.html
+          echo "🔧 Injecting release list into index.html..."
 
-          # Insert it in place of the placeholder (any line containing RELEASE-LIST)
           awk '
             BEGIN { injected = 0 }
             /RELEASE-LIST/ {
@@ -260,7 +250,6 @@ jobs:
             }
           ' index.html > index.new.html && mv index.new.html index.html
 
-          # Commit if changed
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           if ! git diff --quiet; then
@@ -270,4 +259,5 @@ jobs:
           else
             echo "✅ No changes to commit"
           fi
+  
       
