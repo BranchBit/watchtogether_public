@@ -197,9 +197,14 @@ jobs:
           git clone https://x-access-token:${GH_TOKEN}@github.com/BranchBit/watchtogether_public.git
           cd watchtogether_public
           git fetch --tags
+          echo "Existing tags:"
+          git tag --list
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists in public repo."
+            echo "Tag $TAG already exists in public repo, force updating it."
+            git tag -f $TAG
+            git push -f origin $TAG
           else
+            echo "Creating and pushing new tag $TAG"
             git tag $TAG
             git push origin $TAG
           fi
