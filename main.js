@@ -9,11 +9,22 @@ const os = require("os");
 const { spawn } = require("child_process");
 const fs = require("fs");
 
+const macOsGuidInstalledPath = "/Applications/mpv.app/Contents/MacOS/mpv";
+
 function checkMPVInstalled() {
   return new Promise((resolve, reject) => {
     execFile("mpv", ["--version"], (error) => {
       if (error) {
-        reject(new Error("MPV is not installed or not in PATH"));
+        if (
+          os.platform() === "darwin" &&
+          fs.existsSync(macOsGuidInstalledPath)
+        ) {
+          if (fs.existsSync(macOsGuidInstalledPath)) {
+            resolve(true);
+          }
+        } else {
+          reject(new Error("MPV is not installed or not in PATH"));
+        }
       } else {
         resolve(true);
       }
@@ -168,13 +179,17 @@ ipcMain.on("start-host", async (event, { magnetURI }) => {
   });
 
   const torrentPort = await getPort();
-  const { fileName, torrent } = await spawnTorrentServer(magnetURI, torrentPort);
+  const { fileName, torrent } = await spawnTorrentServer(
+    magnetURI,
+    torrentPort,
+  );
   const streamURL = `http://localhost:${torrentPort}/video`;
 
   torrent.on("download", () => updateTorrent(torrent, fileName));
   torrent.on("done", () => updateTorrent(torrent, fileName));
 
   const hostPlayer = new MPV({
+    binary: checkPath(),
     audio_only: false,
     debug: false,
     args: ["--force-window=yes", "--idle=yes"],
@@ -191,18 +206,19 @@ ipcMain.on("start-host", async (event, { magnetURI }) => {
   }, 2000);
 
   setInterval(() => {
-    hostPlayer.getProperty("time-pos")
-        .then((time) => {
-          const syncPayload = {
-            type: "sync",
-            magnet: magnetURI,
-            time: time !== undefined ? parseFloat(time.toFixed(2)) : 0,
-          };
-          console.log("📡 Broadcasting sync:", syncPayload);
-          win.webContents.send("sync-update", syncPayload);
-          broadcastSync(syncPayload);
-        })
-        .catch((err) => console.error("MPV time-pos read error (host):", err));
+    hostPlayer
+      .getProperty("time-pos")
+      .then((time) => {
+        const syncPayload = {
+          type: "sync",
+          magnet: magnetURI,
+          time: time !== undefined ? parseFloat(time.toFixed(2)) : 0,
+        };
+        console.log("📡 Broadcasting sync:", syncPayload);
+        win.webContents.send("sync-update", syncPayload);
+        broadcastSync(syncPayload);
+      })
+      .catch((err) => console.error("MPV time-pos read error (host):", err));
   }, 2000);
 
   function updateTorrent(t, fileName) {
@@ -230,68 +246,75 @@ ipcMain.on("join-room", async (event, code) => {
   let latestSync = {};
 
   connectToRoom(
-      socketURL,
-      async (sync) => {
-        latestSync = sync;
-        if (!sync.magnet || clientJoined) return;
-        clientJoined = true;
+    socketURL,
+    async (sync) => {
+      latestSync = sync;
+      if (!sync.magnet || clientJoined) return;
+      clientJoined = true;
 
-        const getPort = (await import("get-port")).default;
-        const torrentPort = await getPort();
-        const { fileName, torrent } = await spawnTorrentServer(sync.magnet, torrentPort);
-        const streamURL = `http://localhost:${torrentPort}/video`;
+      const getPort = (await import("get-port")).default;
+      const torrentPort = await getPort();
+      const { fileName, torrent } = await spawnTorrentServer(
+        sync.magnet,
+        torrentPort,
+      );
+      const streamURL = `http://localhost:${torrentPort}/video`;
 
-        torrent.on("download", () => updateTorrent(torrent, fileName));
-        torrent.on("done", () => updateTorrent(torrent, fileName));
+      torrent.on("download", () => updateTorrent(torrent, fileName));
+      torrent.on("done", () => updateTorrent(torrent, fileName));
 
-        const clientPlayer = new MPV({
-          audio_only: false,
-          debug: false,
-          args: ["--force-window=yes", "--idle=yes"],
-        });
+      const clientPlayer = new MPV({
+        binary: checkPath(),
+        audio_only: false,
+        debug: false,
+        args: ["--force-window=yes", "--idle=yes"],
+      });
 
-        setTimeout(async () => {
-          try {
-            await clientPlayer.load(streamURL);
-            await clientPlayer.play();
-            console.log("🎬 Client MPV started playback.");
-          } catch (err) {
-            console.error("❌ Client MPV failed to start:", err);
-          }
-        }, 2000);
-
-        setInterval(() => {
-          clientPlayer.getProperty("time-pos")
-              .then((currentTime) => {
-                if (typeof currentTime === "number" && Math.abs(currentTime - (latestSync.time || 0)) > 2) {
-                  console.log("🔁 Desync detected, correcting...");
-                  clientPlayer.goToPosition(latestSync.time);
-                }
-              })
-              .catch((err) => console.error("MPV sync error (client):", err));
-        }, 2000);
-
-        function updateTorrent(t, fileName) {
-          win.webContents.send("torrent-update", {
-            progress: t.progress,
-            numPeers: t.numPeers,
-            downloadSpeed: t.downloadSpeed,
-            fileName,
-            fileSize: t.length,
-          });
+      setTimeout(async () => {
+        try {
+          await clientPlayer.load(streamURL);
+          await clientPlayer.play();
+          console.log("🎬 Client MPV started playback.");
+        } catch (err) {
+          console.error("❌ Client MPV failed to start:", err);
         }
+      }, 2000);
 
-        win.webContents.send("sync-update", sync);
-      },
-      (errMsg) => {
-        // New: notify user of error in UI
-        console.error("Room join error:", errMsg);
-        clientJoined = false;
-        win.webContents.send("status", errMsg);
+      setInterval(() => {
+        clientPlayer
+          .getProperty("time-pos")
+          .then((currentTime) => {
+            if (
+              typeof currentTime === "number" &&
+              Math.abs(currentTime - (latestSync.time || 0)) > 2
+            ) {
+              console.log("🔁 Desync detected, correcting...");
+              clientPlayer.goToPosition(latestSync.time);
+            }
+          })
+          .catch((err) => console.error("MPV sync error (client):", err));
+      }, 2000);
+
+      function updateTorrent(t, fileName) {
+        win.webContents.send("torrent-update", {
+          progress: t.progress,
+          numPeers: t.numPeers,
+          downloadSpeed: t.downloadSpeed,
+          fileName,
+          fileSize: t.length,
+        });
       }
+
+      win.webContents.send("sync-update", sync);
+    },
+    (errMsg) => {
+      // New: notify user of error in UI
+      console.error("Room join error:", errMsg);
+      clientJoined = false;
+      win.webContents.send("status", errMsg);
+    },
   );
 });
-
 
 function startWebSocketServer(port) {
   wss = new WebSocket.Server({ port });
@@ -325,4 +348,12 @@ function broadcastSync(payload) {
       client.send(JSON.stringify(payload));
     }
   });
+}
+
+function checkPath() {
+  if (os.platform() && fs.existsSync(macOsGuidInstalledPath)) {
+    return macOsGuidInstalledPath;
+  }
+
+  return "mpv";
 }
