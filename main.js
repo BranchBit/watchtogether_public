@@ -166,17 +166,28 @@ function createWindow() {
   win.loadFile("index.html");
 }
 
-async function downloadFile(url, dest) {
+function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(dest);
-    https.get(url, (response) => {
-      response.pipe(file);
-      file.on("finish", () => file.close(resolve));
-    }).on("error", (err) => {
-      fs.unlink(dest, () => reject(err));
+    const curl = spawn("curl", ["-L", "-A", "ElectronApp/1.0", "-o", dest, url]);
+
+    curl.on("error", (err) => reject(new Error(`curl not found or failed: ${err.message}`)));
+
+    curl.on("close", (code) => {
+      if (code === 0 && fs.existsSync(dest)) {
+        const size = fs.statSync(dest).size;
+        if (size < 1_000_000) {
+          const html = fs.readFileSync(dest, "utf8");
+          if (html.includes("<html")) return reject(new Error("Downloaded HTML instead of .7z"));
+          return reject(new Error("Downloaded file is too small."));
+        }
+        resolve();
+      } else {
+        reject(new Error(`curl exited with code ${code}`));
+      }
     });
   });
 }
+
 
 function extractWith7z(archive, dest) {
   return new Promise(async (resolve, reject) => {
