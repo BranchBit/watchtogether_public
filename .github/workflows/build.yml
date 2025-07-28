@@ -145,7 +145,7 @@ jobs:
           APP_VERSION: ${{ env.APP_VERSION }}
 
       - name: Build macOS DMG
-        run: npx electron-builder --mac
+        run: npx electron-builder --mac --x64 --arm64
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
