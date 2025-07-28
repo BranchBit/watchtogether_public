@@ -42,7 +42,8 @@ jobs:
             git push origin "refs/tags/$tag"
           fi
 
-  build-linux:
+
+build-linux:
     needs: create-tag
     if: needs.create-tag.outputs.tag != ''
     env:
@@ -216,4 +217,3 @@ jobs:
           files: artifacts/**/*.*
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-  
