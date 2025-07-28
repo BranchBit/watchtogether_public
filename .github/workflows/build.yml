@@ -201,6 +201,11 @@ jobs:
           git branch temp-release $commit
           git push public temp-release:refs/heads/temp-release
           git push public refs/tags/${TAG}
+
+          # ✅ Delete the branch from the public repo after pushing
+          git push public --delete temp-release
+
+          # Clean up local branch
           git branch -D temp-release
 
       - name: Download artifacts
