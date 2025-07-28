@@ -174,13 +174,15 @@ function downloadFile(url, dest) {
 
     curl.on("close", (code) => {
       if (code === 0 && fs.existsSync(dest)) {
-        const size = fs.statSync(dest).size;
-        if (size < 1_000_000) {
-          const html = fs.readFileSync(dest, "utf8");
-          if (html.includes("<html")) return reject(new Error("Downloaded HTML instead of .7z"));
-          return reject(new Error("Downloaded file is too small."));
-        }
-        resolve();
+        setTimeout(() => {
+          const size = fs.statSync(dest).size;
+          if (size < 1_000_000) {
+            const html = fs.readFileSync(dest, "utf8");
+            if (html.includes("<html")) return reject(new Error("Downloaded HTML instead of .7z"));
+            return reject(new Error("Downloaded file is too small."));
+          }
+          resolve();
+        }, 100); // wait for Windows to unlock file
       } else {
         reject(new Error(`curl exited with code ${code}`));
       }
