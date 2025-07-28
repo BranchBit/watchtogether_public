@@ -1,4 +1,4 @@
-// main.js with fixed MPV auto-download and redirect support
+// main.js — Cleaned up and fixed MPV auto-download and extract via copied archive
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const { spawnTorrentServer } = require("./torrent-server");
@@ -10,14 +10,14 @@ const fs = require("fs");
 const https = require("https");
 const os = require("os");
 
+let win;
+let wss = null;
+
 function checkMPVInstalled() {
   return new Promise((resolve, reject) => {
     execFile("mpv", ["--version"], (error) => {
-      if (error) {
-        reject(new Error("MPV is not installed or not in PATH"));
-      } else {
-        resolve(true);
-      }
+      if (error) reject(new Error("MPV is not installed or not in PATH"));
+      else resolve(true);
     });
   });
 }
@@ -28,18 +28,14 @@ function getMPVErrorMessage(platform) {
       return `
         <h2>MPV Not Found (Windows)</h2>
         <p>This app needs MPV media player installed and available in your PATH.</p>
-        <p><strong>Recommended:</strong></p>
-        <ul>
-          <li><a href="https://github.com/zhongfly/mpv-winbuild/releases/download/2025-07-28-a6f3236/mpv-x86_64-20250728-git-a6f3236.7z" style="color:#8f8;" target="_blank">Download mpv-winbuild, unzip and run installer</a></li>
-        </ul>
-        <p>After installing, restart this app.</p>
-      `;
+        <ul><li><a href="https://github.com/zhongfly/mpv-winbuild/releases/download/2025-07-28-a6f3236/mpv-x86_64-20250728-git-a6f3236.7z" target="_blank" style="color:#8f8">Download mpv-winbuild</a></li></ul>
+        <p>After installing, restart this app.</p>`;
     case "darwin":
-      return `<h2>MPV Not Found (macOS)</h2><p>Install with brew: <code>brew install mpv</code></p>`;
+      return `<h2>MPV Not Found (macOS)</h2><p>Install with <code>brew install mpv</code></p>`;
     case "linux":
       return `<h2>MPV Not Found (Linux)</h2><p>Install with your package manager: <code>sudo apt install mpv</code></p>`;
     default:
-      return `<h2>MPV Not Found</h2><p>Install MPV media player manually.</p>`;
+      return `<h2>MPV Not Found</h2><p>Install MPV manually from https://mpv.io/</p>`;
   }
 }
 
@@ -49,16 +45,13 @@ function showError(htmlMessage) {
     <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
       ${message}
       <p style="color:red;">${htmlMessage}</p>
-    </body>
-  `));
+    </body>`));
 }
 
 function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
     const curl = spawn("curl", ["-L", "-A", "ElectronApp/1.0", "-o", dest, url]);
-
     curl.on("error", (err) => reject(new Error(`curl not found or failed: ${err.message}`)));
-
     curl.on("close", (code) => {
       if (code === 0 && fs.existsSync(dest)) {
         setTimeout(() => {
@@ -69,7 +62,7 @@ function downloadFile(url, dest) {
             return reject(new Error("Downloaded file is too small."));
           }
           resolve();
-        }, 500); // wait for Windows to unlock file
+        }, 500);
       } else {
         reject(new Error(`curl exited with code ${code}`));
       }
@@ -83,34 +76,27 @@ function extractWith7z(archive, dest) {
     const logPath = path.join(app.getPath("userData"), "7z-extract-log.txt");
 
     function spawn7z(sevenZipPath) {
-      if (!fs.existsSync(archive)) return reject(new Error(`Missing archive: ${archive}`));
-
-      try {
-        fs.renameSync(archive, archive); // check file isn't locked
-      } catch (err) {
-        return reject(new Error("Cannot access archive: " + err.message));
-      }
-
-      if (fs.existsSync(dest)) {
-        try {
-          fs.rmSync(dest, { recursive: true, force: true });
-        } catch (e) {
-          return reject(new Error("Failed to clean extract folder: " + e.message));
-        }
-      }
+      if (!fs.existsSync(archive)) return reject(new Error(`Archive not found: ${archive}`));
+      if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true });
       fs.mkdirSync(dest, { recursive: true });
 
       const args = ["x", archive, `-o${dest}`, "-y"];
       const out = fs.openSync(logPath, 'w');
-      const proc = spawn(sevenZipPath, args, { windowsHide: true, stdio: ['ignore', out, out] });
+      const proc = spawn(sevenZipPath, args, {
+        windowsHide: true,
+        stdio: ['ignore', out, out],
+      });
 
-      proc.on("error", err => reject(new Error(`Failed to launch 7z: ${err.message}`)));
-      proc.on("close", code => {
+      proc.on("error", (err) => reject(new Error(`Failed to launch 7z: ${err.message}`)));
+      proc.on("close", (code) => {
         fs.closeSync(out);
-        if (code === 0) return resolve();
-        const output = fs.readFileSync(logPath, "utf8");
-        reject(new Error(`7z exit code ${code}:
+        if (code === 0) resolve();
+        else {
+          const output = fs.readFileSync(logPath, "utf8");
+          reject(new Error(`7z exited with code ${code}:
+
 ${output}`));
+        }
       });
     }
 
@@ -119,32 +105,57 @@ ${output}`));
       await downloadFile("https://www.7-zip.org/a/7zr.exe", local7zrPath);
       spawn7z(local7zrPath);
     } catch (err) {
-      reject(new Error("Failed to get 7zr: " + err.message));
+      reject(new Error("Failed to download 7zr.exe: " + err.message));
     }
   });
-};
-
-const args = ["x", archive, `-o${dest}`, "-y"];
-const out = fs.openSync(logPath, 'w');
-const proc = spawn(sevenZipPath, args, { windowsHide: true, stdio: ['ignore', out, out] });
-
-proc.on("error", err => reject(new Error(`Failed to launch 7z: ${err.message}`)));
-proc.on("close", code => {
-  fs.closeSync(out);
-  if (code === 0) return resolve();
-  const output = fs.readFileSync(logPath, "utf8");
-  reject(new Error(`7z exit code ${code}:\n${output}`));
-});
 }
 
-if (fs.existsSync(local7zrPath)) return spawn7z(local7zrPath);
-try {
-  await downloadFile("https://www.7-zip.org/a/7zr.exe", local7zrPath);
-  spawn7z(local7zrPath);
-} catch (err) {
-  reject(new Error("Failed to get 7zr: " + err.message));
+async function attemptAutoInstallMPV() {
+  win = new BrowserWindow({
+    width: 600,
+    height: 400,
+    title: "Installing MPV...",
+    webPreferences: { contextIsolation: false, nodeIntegration: true },
+  });
+  win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
+    <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+      <h2>MPV Not Found</h2>
+      <p>Attempting to download and install MPV for Windows...</p>
+    </body>`));
+
+  const archivePath = path.join(app.getPath("temp"), "mpv.7z");
+  const archiveCopy = archivePath + ".copy.7z";
+  const extractDir = path.join(app.getPath("userData"), "mpv");
+  const MPV_URL = "https://github.com/zhongfly/mpv-winbuild/releases/download/2025-07-28-a6f3236/mpv-x86_64-20250728-git-a6f3236.7z";
+
+  try {
+    await downloadFile(MPV_URL, archivePath);
+    fs.copyFileSync(archivePath, archiveCopy);
+    await extractWith7z(archiveCopy, extractDir);
+    process.env.PATH = `${extractDir};${process.env.PATH}`;
+    await checkMPVInstalled();
+    win.close();
+    createWindow();
+  } catch (e) {
+    const message = getMPVErrorMessage("win32");
+    const logPath = path.join(app.getPath("userData"), "7z-extract-log.txt");
+    let errorDetails = fs.existsSync(logPath) ? fs.readFileSync(logPath, "utf8").slice(0, 800) : "";
+    win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
+      <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+        ${message}
+        <p style="color:red;">Automatic install failed: ${e.message}</p>
+        <pre style="max-height: 300px; overflow-y: auto; background:#222; color:#ccc; padding:10px;">${errorDetails}</pre>
+      </body>`));
+  }
 }
-});
+
+function createWindow() {
+  win = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: { contextIsolation: false, nodeIntegration: true },
+  });
+  win.loadFile("index.html");
 }
 
 app.whenReady().then(async () => {
@@ -152,50 +163,11 @@ app.whenReady().then(async () => {
     await checkMPVInstalled();
     createWindow();
   } catch {
-    if (os.platform() !== "win32") {
-      showError("MPV not found");
-      return;
-    }
-
-    const archivePath = path.join(app.getPath("temp"), "mpv.7z");
-    const extractDir = path.join(app.getPath("userData"), "mpv");
-    const MPV_URL = "https://github.com/zhongfly/mpv-winbuild/releases/download/2025-07-28-a6f3236/mpv-x86_64-20250728-git-a6f3236.7z";
-
-    win = new BrowserWindow({ width: 600, height: 400, title: "Installing MPV", webPreferences: { nodeIntegration: true }});
-    win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`<body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;"><h2>MPV Missing</h2><p>Downloading and installing...</p></body>`));
-
-    try {
-      await downloadFile(MPV_URL, archivePath);
-
-      const stats = fs.statSync(archivePath);
-      if (stats.size < 1_000_000) {
-        const content = fs.readFileSync(archivePath, "utf8");
-        if (content.includes("<html")) throw new Error("Downloaded HTML instead of 7z");
-        throw new Error("Downloaded MPV archive is too small.");
-      }
-
-      await extractWith7z(archivePath, extractDir);
-      process.env.PATH = `${extractDir};${process.env.PATH}`;
-      await checkMPVInstalled();
-      win.close();
-      createWindow();
-    } catch (e) {
-      showError("Install failed: " + e.message);
-    }
+    if (os.platform() === "win32") await attemptAutoInstallMPV();
+    else showError("MPV not found");
   }
 });
 
-function createWindow() {
-  win = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-      contextIsolation: false,
-      nodeIntegration: true,
-    },
-  });
-  win.loadFile("index.html");
-}
 
 
 function downloadFile(url, dest) {
@@ -297,7 +269,7 @@ async function attemptAutoInstallMPV() {
 
   try {
     await downloadFile(MPV_URL, archivePath);
-    const archiveCopy = archivePath + \".copy.7z\";
+    const archiveCopy = archivePath + ".copy.7z";
     fs.copyFileSync(archivePath, archiveCopy);
     await extractWith7z(archiveCopy, extractDir);
     process.env.PATH = `${extractDir};${process.env.PATH}`;
