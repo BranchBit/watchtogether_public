@@ -7,55 +7,6 @@ const MPV = require("node-mpv");
 const { execFile } = require("child_process");
 const os = require("os");
 
-
-const fs = require("fs");
-const https = require("https");
-const { exec } = require("child_process");
-
-const MPV_DOWNLOAD_URL = "https://github.com/zhongfly/mpv-winbuild/releases/download/2025-07-28-a6f3236/mpv-x86_64-20250728-git-a6f3236.7z";
-
-async function ensureMPVInstalled() {
-  try {
-    await checkMPVInstalled();
-    return "mpv";
-  } catch {
-    if (os.platform() !== "win32") throw new Error("MPV not found and auto-download only supported on Windows.");
-
-    const userDir = path.join(app.getPath("userData"), "mpv");
-    const mpvExePath = path.join(userDir, "mpv.exe");
-    if (fs.existsSync(mpvExePath)) return mpvExePath;
-
-    fs.mkdirSync(userDir, { recursive: true });
-    const archivePath = path.join(userDir, "mpv.7z");
-
-    console.log("⬇️ Downloading MPV...");
-    await downloadFile(MPV_DOWNLOAD_URL, archivePath);
-    console.log("✅ Downloaded MPV to", archivePath);
-
-    const sevenZip = path.join(__dirname, "7za.exe");
-    console.log("📦 Extracting MPV...");
-    await new Promise((resolve, reject) => {
-      exec(`"${sevenZip}" x "${archivePath}" -o"${userDir}" -y`, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
-
-    if (!fs.existsSync(mpvExePath)) throw new Error("MPV extraction failed");
-    return mpvExePath;
-  }
-}
-
-function downloadFile(url, dest) {
-  return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(dest);
-    https.get(url, (response) => {
-      if (response.statusCode !== 200) return reject(new Error(`Failed to download: ${response.statusCode}`));
-      response.pipe(file);
-      file.on("finish", () => file.close(resolve));
-    }).on("error", reject);
-  });
-}
 function checkMPVInstalled() {
   return new Promise((resolve, reject) => {
     execFile("mpv", ["--version"], (error) => {
@@ -142,62 +93,15 @@ function createWindow() {
   win.loadFile("index.html");
 }
 
-
-
 app.whenReady().then(async () => {
-  const platform = os.platform();
-  let installingWin = null;
-
   try {
-    let mpvPath = "mpv";
-
-    if (platform === "win32") {
-      installingWin = new BrowserWindow({
-        width: 400,
-        height: 200,
-        frame: false,
-        resizable: false,
-        alwaysOnTop: true,
-        webPreferences: {
-          contextIsolation: false,
-          nodeIntegration: true,
-        },
-      });
-
-      installingWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
-        <body style='font-family:sans-serif;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;height:100%;'>
-          <h2>🔧 Installing MPV Player...</h2>
-        </body>
-      `));
-
-      mpvPath = await ensureMPVInstalled();
-    } else {
-      await checkMPVInstalled();
-    }
-
-    if (installingWin) installingWin.close();
-
-    if (platform === "win32") {
-      mpvPath = await ensureMPVInstalled();
-    } else {
-      await checkMPVInstalled();
-    }
-
+    await checkMPVInstalled();
     createWindow();
-  }
-} catch (err) {
-  console.error("❌", err.message);
-  const message = getMPVErrorMessage(platform);
+  } catch (err) {
+    console.error("❌", err.message);
+    const platform = os.platform();
+    const message = getMPVErrorMessage(platform);
 
-  if (installingWin) {
-    installingWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
-        <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
-          ${message}
-        </body>
-      `));
-    installingWin.setSize(600, 400);
-    installingWin.center();
-  } else {
     const errorWin = new BrowserWindow({
       width: 600,
       height: 400,
@@ -212,18 +116,15 @@ app.whenReady().then(async () => {
     });
 
     errorWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
-        <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
-          ${message}
-        </body>
-      `));
+      <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+        ${message}
+      </body>
+    `));
 
     errorWin.on("closed", () => {
       app.quit();
     });
   }
-}
-);
-}
 });
 
 ipcMain.on("start-host", async (event, { magnetURI }) => {
