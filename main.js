@@ -299,7 +299,9 @@ async function attemptAutoInstallMPV() {
 
   try {
     await downloadFile(MPV_URL, archivePath);
-    await extractWith7z(archivePath, extractDir);
+    const archiveCopy = archivePath + \".copy.7z\";
+    fs.copyFileSync(archivePath, archiveCopy);
+    await extractWith7z(archiveCopy, extractDir);
     process.env.PATH = `${extractDir};${process.env.PATH}`;
     await checkMPVInstalled();
     win.close();
