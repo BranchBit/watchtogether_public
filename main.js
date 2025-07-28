@@ -113,8 +113,19 @@ function extractWith7z(archive, dest) {
     const local7zrPath = path.join(app.getPath("userData"), "7zr.exe");
 
     function spawn7z(sevenZipPath) {
+      if (!fs.existsSync(archive)) {
+        return reject(new Error(`Archive not found at: ${archive}`));
+      }
+
+      if (!fs.existsSync(dest)) {
+        fs.mkdirSync(dest, { recursive: true });
+      }
+
       const args = ["x", archive, `-o${dest}`, "-y"];
-      const proc = spawn(sevenZipPath, args, { windowsHide: true });
+      const proc = spawn(sevenZipPath, args, {
+        windowsHide: true,
+        stdio: "inherit", // helps debug
+      });
 
       proc.on("error", (err) => {
         reject(new Error(`Failed to launch 7z: ${err.message}`));
@@ -133,7 +144,6 @@ function extractWith7z(archive, dest) {
       return spawn7z(local7zrPath);
     }
 
-    // Try system 7z first
     const systemProc = spawn("7z", ["-h"]);
     systemProc.on("error", async () => {
       if (isWin) {
