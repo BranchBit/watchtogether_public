@@ -215,49 +215,30 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Update GitHub Pages release list
+      - name: Insert new release into GitHub Pages
         run: |
           git clone https://x-access-token:${GH_TOKEN}@github.com/BranchBit/watchtogether_public.git public-pages
           cd public-pages
 
-          TAGS=$(git tag --sort=-v:refname | grep '^v' | head -n 10 || true)
+          # Generate the new list item
+          NEW_ITEM="<li><a href='https://github.com/BranchBit/watchtogether_public/releases/tag/${TAG}'>${TAG}</a></li>"
 
-          {
-            echo "<!--RELEASE-LIST-->"
-            echo "<h3>Releases</h3>"
-            echo "<ul class='release-list'>"
-            for TAG in $TAGS; do
-              echo "  <li><a href='https://github.com/BranchBit/watchtogether_public/releases/tag/$TAG'>$TAG</a></li>"
-            done
-            echo "</ul>"
-          } > release-block.html
-
-          echo "🔧 Injecting release list into index.html..."
-
-          awk '
-            BEGIN { injected = 0 }
+          # Insert the new item immediately after the placeholder comment
+          awk -v newitem="$NEW_ITEM" '
             /RELEASE-LIST/ {
-              while ((getline line < "release-block.html") > 0) print line;
-              injected = 1;
+              print $0
+              print newitem
               next
             }
             { print }
-            END {
-              if (injected == 0) {
-                print "❌ ERROR: RELEASE-LIST placeholder not found!" > "/dev/stderr";
-                exit 1;
-              }
-            }
           ' index.html > index.new.html && mv index.new.html index.html
 
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           if ! git diff --quiet; then
             git add index.html
-            git commit -m "Update GitHub Pages with latest release list"
+            git commit -m "Insert ${TAG} into release list"
             git push origin main
           else
             echo "✅ No changes to commit"
           fi
-  
-      
