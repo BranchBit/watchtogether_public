@@ -225,31 +225,53 @@ jobs:
         run: |
           cd private
 
-          # Fetch all tags (sorted newest first)
+          # Print current working directory and file list for debugging
+          echo "🔍 Current dir:"
+          pwd
+          echo "📄 Files:"
+          ls -al
+
+          # Fetch the 10 most recent tags
           TAGS=$(git tag --sort=-v:refname | grep '^v' | head -n 10)
 
-          # Build release list HTML block
-          LIST_HTML="<h3>Releases</h3><ul class='release-list'>"
-          for TAG in $TAGS; do
-            LIST_HTML+="<li><a href='https://github.com/BranchBit/watchtogether_public/releases/tag/$TAG'>$TAG</a></li>"
-          done
-          LIST_HTML+="</ul>"
+          # Build the release list HTML block
+          {
+            echo "<h3>Releases</h3>"
+            echo "<ul class='release-list'>"
+            for TAG in $TAGS; do
+              echo "  <li><a href='https://github.com/BranchBit/watchtogether_public/releases/tag/$TAG'>$TAG</a></li>"
+            done
+            echo "</ul>"
+          } > release-block.html
 
-          # Save to a temp file
-          echo "$LIST_HTML" > /tmp/releases.html
+          echo "📝 Generated release block:"
+          cat release-block.html
 
-          # Replace placeholder in index.html
-          sed -i '/<!--RELEASE-LIST-->/r /tmp/releases.html' index.html
-          sed -i '/<!--RELEASE-LIST-->/d' index.html
+          # Ensure placeholder exists
+          if ! grep -q '<!--RELEASE-LIST-->' index.html; then
+            echo "❌ ERROR: Placeholder <!--RELEASE-LIST--> not found in index.html"
+            exit 1
+          fi
 
-          # Only commit if there are changes
+          # Replace placeholder with generated release list (inline)
+          awk '
+            /<!--RELEASE-LIST-->/ {
+              while ((getline line < "release-block.html") > 0) print line;
+              next
+            }
+            { print }
+          ' index.html > index.new.html && mv index.new.html index.html
+
+          # Git config and commit if changed
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
+
           if ! git diff --quiet; then
             git add index.html
             git commit -m "Update GitHub Pages with latest release list"
             git push origin main
           else
-            echo "No changes to commit."
+            echo "✅ No changes to index.html"
           fi
+      
       
