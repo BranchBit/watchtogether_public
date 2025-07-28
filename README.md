@@ -20,7 +20,7 @@ A cross-platform app to watch videos together with friends in real-time.
 ## 🍎 Mac
 
 ### Installation
-- Download the `.dmg` or `.zip` file from the [Releases](https://github.com/branchbit/watchtogether_public/releases).
+- Download the `.dmg` file from the [Releases](https://github.com/branchbit/watchtogether_public/releases).
 - Open it and drag the app to your **Applications** folder.
 - You might need to allow it under **System Preferences > Security & Privacy > General**.
 
