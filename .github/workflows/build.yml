@@ -187,6 +187,23 @@ jobs:
         with:
           path: artifacts
 
+      - name: Push tag to public repo
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          TAG: ${{ needs.create-tag.outputs.tag }}
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git clone https://x-access-token:${GH_TOKEN}@github.com/BranchBit/watchtogether_public.git
+          cd watchtogether_public
+          git fetch --tags
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists in public repo."
+          else
+            git tag $TAG
+            git push origin $TAG
+          fi
+
       - name: Create Release and upload assets to PUBLIC repo
         uses: softprops/action-gh-release@v2
         with:
