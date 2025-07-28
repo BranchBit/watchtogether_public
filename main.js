@@ -109,10 +109,36 @@ async function downloadFile(url, dest) {
 
 function extractWith7z(archive, dest) {
   return new Promise((resolve, reject) => {
-    const sevenZip = "7z";
+    const isWin = os.platform() === "win32";
+    const local7zrPath = path.join(app.getPath("userData"), "7zr.exe");
+
+    const useLocal7z = fs.existsSync(local7zrPath);
+    const sevenZip = useLocal7z ? local7zrPath : "7z";
+
     const args = ["x", archive, `-o${dest}`, "-y"];
     const proc = spawn(sevenZip, args);
-    proc.on("close", (code) => (code === 0 ? resolve() : reject(new Error("7z extraction failed"))));
+
+    proc.on("error", async (err) => {
+      if (isWin && !useLocal7z) {
+        console.log("🔍 7z not found, downloading portable 7zr...");
+        try {
+          await downloadFile(
+              "https://www.7-zip.org/a/7zr.exe",
+              local7zrPath
+          );
+          extractWith7z(archive, dest).then(resolve).catch(reject);
+        } catch (downloadErr) {
+          reject(new Error("Failed to download portable 7zr: " + downloadErr.message));
+        }
+      } else {
+        reject(err);
+      }
+    });
+
+    proc.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error("7z extraction failed with code " + code));
+    });
   });
 }
 
