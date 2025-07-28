@@ -40,12 +40,12 @@
     },
     "linux": {
       "target": "AppImage"
-    }
-  },
-  "extraResources": [
-    {
-      "from": "assets/install-mpv.bat",
-      "to": "install-mpv.bat"
-    }
-  ]
+    },
+    "extraResources": [
+      {
+        "from": "assets/install-mpv.bat",
+        "to": "install-mpv.bat"
+      }
+    ]
+  }
 }
