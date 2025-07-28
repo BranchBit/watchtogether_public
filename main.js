@@ -135,28 +135,8 @@ app.whenReady().then(async () => {
       });
     });
 
-    errorWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
-  <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
-    ${message}
-    <button id="install" style="margin-top:20px;padding:10px 20px;font-size:16px;">Install MPV Automatically</button>
-    <pre id="log" style="background:#000;padding:10px;color:#0f0;overflow:auto;height:200px;margin-top:10px;"></pre>
+    errorWin.loadFile("mpv-error.html");
 
-    <script>
-      const { ipcRenderer } = require('electron');
-
-      document.getElementById("install").onclick = () => {
-        document.getElementById("log").textContent = "Starting installation...\n";
-        ipcRenderer.invoke("install-mpv");
-      };
-
-      ipcRenderer.on("installer-log", (_, msg) => {
-        const log = document.getElementById("log");
-        log.textContent += msg;
-        log.scrollTop = log.scrollHeight;
-      });
-    </script>
-  </body>
-`));
 
     errorWin.on("closed", () => {
       app.quit();
