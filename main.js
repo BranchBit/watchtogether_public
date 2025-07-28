@@ -112,32 +112,48 @@ function extractWith7z(archive, dest) {
     const isWin = os.platform() === "win32";
     const local7zrPath = path.join(app.getPath("userData"), "7zr.exe");
 
-    const useLocal7z = fs.existsSync(local7zrPath);
-    const sevenZip = useLocal7z ? local7zrPath : "7z";
+    function spawn7z(sevenZipPath) {
+      const args = ["x", archive, `-o${dest}`, "-y"];
+      const proc = spawn(sevenZipPath, args, { windowsHide: true });
 
-    const args = ["x", archive, `-o${dest}`, "-y"];
-    const proc = spawn(sevenZip, args);
+      proc.on("error", (err) => {
+        reject(new Error(`Failed to launch 7z: ${err.message}`));
+      });
 
-    proc.on("error", async (err) => {
-      if (isWin && !useLocal7z) {
-        console.log("🔍 7z not found, downloading portable 7zr...");
+      proc.on("close", (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`7z extraction failed (code ${code})`));
+        }
+      });
+    }
+
+    if (fs.existsSync(local7zrPath)) {
+      return spawn7z(local7zrPath);
+    }
+
+    // Try system 7z first
+    const systemProc = spawn("7z", ["-h"]);
+    systemProc.on("error", async () => {
+      if (isWin) {
+        console.log("⬇️  Downloading portable 7zr.exe...");
         try {
-          await downloadFile(
-              "https://www.7-zip.org/a/7zr.exe",
-              local7zrPath
-          );
-          extractWith7z(archive, dest).then(resolve).catch(reject);
+          await downloadFile("https://www.7-zip.org/a/7zr.exe", local7zrPath);
+          console.log("✅  7zr.exe downloaded, extracting archive...");
+          spawn7z(local7zrPath);
         } catch (downloadErr) {
-          reject(new Error("Failed to download portable 7zr: " + downloadErr.message));
+          reject(new Error("Failed to download 7zr.exe: " + downloadErr.message));
         }
       } else {
-        reject(err);
+        reject(new Error("7z is not available and platform is not Windows"));
       }
     });
 
-    proc.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error("7z extraction failed with code " + code));
+    systemProc.on("close", (code) => {
+      if (code === 0) {
+        spawn7z("7z");
+      }
     });
   });
 }
