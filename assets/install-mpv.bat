@@ -38,10 +38,8 @@ move /y "%TMP_DIR%\%MPV_FOLDER%" "%INSTALL_DIR%" >nul
 :: Step 6: Cleanup and debug info
 echo.
 echo ✅ Done! MPV installed to: %INSTALL_DIR%
-echo 🧠 You may need to log out and back in for the PATH to update everywhere.
+echo 🧠 You may now restart the app.
 echo.
-::echo 🧪 User PATH now includes:
-::reg query HKCU\Environment /v PATH
 echo.
 
 pause
