@@ -1,3 +1,4 @@
+// main.js with fixed MPV auto-download and redirect support
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const { spawnTorrentServer } = require("./torrent-server");
@@ -33,55 +34,125 @@ function getMPVErrorMessage(platform) {
         </ul>
         <p>After installing, restart this app.</p>
       `;
-
     case "darwin":
-      return `
-        <h2>MPV Not Found (macOS)</h2>
-        <p>This app requires MPV to be installed.</p>
-        <ul>
-          <li><a href="https://github.com/mpv-player/mpv/releases/latest" style="color:#8f8;" target="_blank">Download latest MPV for macOS</a></li>
-          <li>Or install via Homebrew: <code>brew install mpv</code></li>
-        </ul>
-        <p>After installing, restart this app.</p>
-      `;
-
+      return `<h2>MPV Not Found (macOS)</h2><p>Install with brew: <code>brew install mpv</code></p>`;
     case "linux":
-      return `
-        <h2>MPV Not Found (Linux)</h2>
-        <p>This app requires MPV installed and accessible via PATH.</p>
-        <p>Use your distro’s package manager:</p>
-        <ul>
-          <li>Debian/Ubuntu: <code>sudo apt install mpv</code></li>
-          <li>Fedora: <code>sudo dnf install mpv</code></li>
-          <li>Arch: <code>sudo pacman -S mpv</code></li>
-        </ul>
-        <p>After installing, restart this app.</p>
-      `;
-
+      return `<h2>MPV Not Found (Linux)</h2><p>Install with your package manager: <code>sudo apt install mpv</code></p>`;
     default:
-      return `
-        <h2>MPV Not Found (Unknown Platform)</h2>
-        <p>This app requires the MPV media player.</p>
-        <p><a href="https://mpv.io/" style="color:#8f8;" target="_blank">Visit mpv.io for instructions</a></p>
-        <p>After installing, restart this app.</p>
-      `;
+      return `<h2>MPV Not Found</h2><p>Install MPV media player manually.</p>`;
   }
 }
 
-function encodeInviteURL(url) {
-  return Buffer.from(url).toString("base64url");
+function showError(htmlMessage) {
+  const message = getMPVErrorMessage(os.platform());
+  win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
+    <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+      ${message}
+      <p style="color:red;">${htmlMessage}</p>
+    </body>
+  `));
 }
 
-function decodeInviteCode(code) {
+function downloadFile(url, dest, maxRedirects = 5) {
+  return new Promise((resolve, reject) => {
+    const doRequest = (urlToFetch, redirectCount) => {
+      if (redirectCount > maxRedirects) {
+        return reject(new Error("Too many redirects"));
+      }
+
+      https.get(urlToFetch, {
+        headers: { "User-Agent": "ElectronApp/1.0" },
+      }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          const redirectUrl = new URL(res.headers.location, urlToFetch).toString();
+          return doRequest(redirectUrl, redirectCount + 1);
+        }
+
+        if (res.statusCode !== 200) {
+          return reject(new Error(`Download failed. Status: ${res.statusCode}`));
+        }
+
+        const file = fs.createWriteStream(dest);
+        res.pipe(file);
+        file.on("finish", () => file.close(resolve));
+      }).on("error", (err) => {
+        reject(err);
+      });
+    };
+
+    doRequest(url, 0);
+  });
+}
+
+function extractWith7z(archive, dest) {
+  return new Promise(async (resolve, reject) => {
+    const local7zrPath = path.join(app.getPath("userData"), "7zr.exe");
+    const logPath = path.join(app.getPath("userData"), "7z-extract-log.txt");
+
+    function spawn7z(sevenZipPath) {
+      if (!fs.existsSync(archive)) return reject(new Error(`Missing archive: ${archive}`));
+      if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+
+      const args = ["x", archive, `-o${dest}`, "-y"];
+      const out = fs.openSync(logPath, 'w');
+      const proc = spawn(sevenZipPath, args, { windowsHide: true, stdio: ['ignore', out, out] });
+
+      proc.on("error", err => reject(new Error(`Failed to launch 7z: ${err.message}`)));
+      proc.on("close", code => {
+        fs.closeSync(out);
+        if (code === 0) return resolve();
+        const output = fs.readFileSync(logPath, "utf8");
+        reject(new Error(`7z exit code ${code}:\n${output}`));
+      });
+    }
+
+    if (fs.existsSync(local7zrPath)) return spawn7z(local7zrPath);
+    try {
+      await downloadFile("https://www.7-zip.org/a/7zr.exe", local7zrPath);
+      spawn7z(local7zrPath);
+    } catch (err) {
+      reject(new Error("Failed to get 7zr: " + err.message));
+    }
+  });
+}
+
+app.whenReady().then(async () => {
   try {
-    return Buffer.from(code, "base64url").toString();
+    await checkMPVInstalled();
+    createWindow();
   } catch {
-    return null;
-  }
-}
+    if (os.platform() !== "win32") {
+      showError("MPV not found");
+      return;
+    }
 
-let win;
-let wss = null;
+    const archivePath = path.join(app.getPath("temp"), "mpv.7z");
+    const extractDir = path.join(app.getPath("userData"), "mpv");
+    const MPV_URL = "https://github.com/zhongfly/mpv-winbuild/releases/download/2025-07-28-a6f3236/mpv-x86_64-20250728-git-a6f3236.7z";
+
+    win = new BrowserWindow({ width: 600, height: 400, title: "Installing MPV", webPreferences: { nodeIntegration: true }});
+    win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`<body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;"><h2>MPV Missing</h2><p>Downloading and installing...</p></body>`));
+
+    try {
+      await downloadFile(MPV_URL, archivePath);
+
+      const stats = fs.statSync(archivePath);
+      if (stats.size < 1_000_000) {
+        const content = fs.readFileSync(archivePath, "utf8");
+        if (content.includes("<html")) throw new Error("Downloaded HTML instead of 7z");
+        throw new Error("Downloaded MPV archive is too small.");
+      }
+
+      await extractWith7z(archivePath, extractDir);
+      process.env.PATH = `${extractDir};${process.env.PATH}`;
+      await checkMPVInstalled();
+      win.close();
+      createWindow();
+    } catch (e) {
+      showError("Install failed: " + e.message);
+    }
+  }
+});
 
 function createWindow() {
   win = new BrowserWindow({
