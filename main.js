@@ -6,6 +6,8 @@ const localtunnel = require("localtunnel");
 const MPV = require("node-mpv");
 const { execFile } = require("child_process");
 const os = require("os");
+const { spawn } = require("child_process");
+const fs = require("fs");
 
 function checkMPVInstalled() {
   return new Promise((resolve, reject) => {
@@ -115,11 +117,46 @@ app.whenReady().then(async () => {
       },
     });
 
+    ipcMain.handle("install-mpv", async (event) => {
+      const batPath = path.join(__dirname, "assets", "install-mpv.bat");
+
+      const proc = spawn("cmd.exe", ["/c", batPath]);
+
+      proc.stdout.on("data", (data) => {
+        errorWin.webContents.send("installer-log", data.toString());
+      });
+
+      proc.stderr.on("data", (data) => {
+        errorWin.webContents.send("installer-log", "ERROR: " + data.toString());
+      });
+
+      proc.on("exit", (code) => {
+        errorWin.webContents.send("installer-log", `\nInstaller exited with code ${code}\nRestart the app to try again.`);
+      });
+    });
+
     errorWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
-      <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
-        ${message}
-      </body>
-    `));
+  <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+    ${message}
+    <button id="install" style="margin-top:20px;padding:10px 20px;font-size:16px;">Install MPV Automatically</button>
+    <pre id="log" style="background:#000;padding:10px;color:#0f0;overflow:auto;height:200px;margin-top:10px;"></pre>
+
+    <script>
+      const { ipcRenderer } = require('electron');
+
+      document.getElementById("install").onclick = () => {
+        document.getElementById("log").textContent = "Starting installation...\n";
+        ipcRenderer.invoke("install-mpv");
+      };
+
+      ipcRenderer.on("installer-log", (_, msg) => {
+        const log = document.getElementById("log");
+        log.textContent += msg;
+        log.scrollTop = log.scrollHeight;
+      });
+    </script>
+  </body>
+`));
 
     errorWin.on("closed", () => {
       app.quit();
