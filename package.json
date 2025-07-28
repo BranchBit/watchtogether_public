@@ -26,7 +26,8 @@
     "productName": "WatchTogether",
     "files": [
       "**/*",
-      "!node_modules/.cache"
+      "!node_modules/.cache",
+      "assets/**/*"
     ],
     "directories": {
       "output": "dist"
