@@ -24,9 +24,9 @@ function checkMPVInstalled() {
           }
         } else if (
             os.platform() === "win32" &&
-            fs.existsSync(macOsGuidInstalledPath)
+            fs.existsSync(winGuidInstalledPath)
         ) {
-          if (fs.existsSync(macOsGuidInstalledPath)) {
+          if (fs.existsSync(winGuidInstalledPath)) {
             resolve(true);
           }
         } else  {
