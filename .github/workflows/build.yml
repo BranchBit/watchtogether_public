@@ -33,7 +33,9 @@ jobs:
       - name: Create and push tag (only if new)
         run: |
           tag=${{ steps.get_tag.outputs.tag }}
-          if git rev-parse "$tag" >/dev/null 2>&1; then
+          if [ -z "$tag" ]; then
+            echo "❌ No tag was generated. Skipping push."
+          elif git rev-parse "$tag" >/dev/null 2>&1; then
             echo "⚠️ Tag $tag already exists. Skipping push."
           else
             git config user.name "github-actions"
@@ -41,7 +43,6 @@ jobs:
             git tag "$tag"
             git push origin "refs/tags/$tag"
           fi
-
 
 build-linux:
     needs: create-tag
