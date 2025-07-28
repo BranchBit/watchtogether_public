@@ -76,8 +76,6 @@ function downloadFile(url, dest) {
     });
   });
 }
-});
-}
 
 function extractWith7z(archive, dest) {
   return new Promise(async (resolve, reject) => {
