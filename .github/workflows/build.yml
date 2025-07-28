@@ -221,4 +221,26 @@ jobs:
           files: artifacts/**/*.*
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-  
+      - name: Update GitHub Pages release list
+        run: |
+          cd private
+
+          # Fetch all tags (sorted newest first)
+          TAGS=$(git tag --sort=-v:refname | grep '^v' | head -n 10)
+
+          # Build release list HTML
+          LIST_HTML="<h3>Releases</h3><ul class='release-list'>"
+          for TAG in $TAGS; do
+            LIST_HTML+="<li><a href='https://github.com/BranchBit/watchtogether_public/releases/tag/$TAG'>$TAG</a></li>"
+          done
+          LIST_HTML+="</ul>"
+
+          # Insert the list into index.html (replace placeholder comment)
+          sed -i '/<!--RELEASE-LIST-->/c\'"$LIST_HTML" index.html
+
+          # Push the updated index.html
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add index.html
+          git commit -m "Update GitHub Pages with latest release list"
+          git push origin main
