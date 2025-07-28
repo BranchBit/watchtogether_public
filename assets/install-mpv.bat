@@ -7,7 +7,7 @@ set "SEVENZIP_EXE=7zr.exe"
 set "MPV_URL=https://github.com/zhongfly/mpv-winbuild/releases/download/2025-07-28-a6f3236/mpv-x86_64-20250728-git-a6f3236.7z"
 set "MPV_ARCHIVE=mpv.7z"
 set "MPV_FOLDER=mpv"
-set "INSTALL_DIR=%USERPROFILE%\mpv"
+set "INSTALL_DIR=%USERPROFILE%\AppData\Roaming\mpv"
 
 :: Create a temp working dir
 set "TMP_DIR=%TEMP%\mpvsetup"

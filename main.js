@@ -10,7 +10,7 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 
 const macOsGuidInstalledPath = "/Applications/mpv.app/Contents/MacOS/mpv";
-const winGuidInstalledPath = `C:/Users/${os.userInfo().username}/mpv`;
+const winGuidInstalledPath = `C:/Users/${os.userInfo().username}/AppData/Roaming/mpv`;
 function checkMPVInstalled() {
   return new Promise((resolve, reject) => {
     execFile("mpv", ["--version"], (error) => {
@@ -23,13 +23,13 @@ function checkMPVInstalled() {
             resolve(true);
           }
         } else if (
-            os.platform() === "win32" &&
-            fs.existsSync(winGuidInstalledPath)
+          os.platform() === "win32" &&
+          fs.existsSync(winGuidInstalledPath)
         ) {
           if (fs.existsSync(winGuidInstalledPath)) {
             resolve(true);
           }
-        } else  {
+        } else {
           reject(new Error("MPV is not installed or not in PATH"));
         }
       } else {
@@ -139,7 +139,10 @@ app.whenReady().then(async () => {
       const batPath = path.join(process.resourcesPath, "install-mpv.bat");
 
       if (!fs.existsSync(batPath)) {
-        errorWin.webContents.send("installer-log", "ERROR: install-mpv.bat not found.\n");
+        errorWin.webContents.send(
+          "installer-log",
+          "ERROR: install-mpv.bat not found.\n",
+        );
         return;
       }
 
@@ -155,8 +158,8 @@ app.whenReady().then(async () => {
 
       proc.on("exit", (code) => {
         errorWin.webContents.send(
-            "installer-log",
-            `\nInstaller exited with code ${code}\nRestart the app to try again.`,
+          "installer-log",
+          `\nInstaller exited with code ${code}\nRestart the app to try again.`,
         );
       });
     });
