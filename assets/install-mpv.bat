@@ -16,33 +16,50 @@ cd /d "%TMP_DIR%"
 
 :: Step 1: Download 7zr.exe if not exists
 if not exist "%TMP_DIR%\%SEVENZIP_EXE%" (
-    echo Downloading 7zr.exe...
+    echo 🔽 Downloading 7zr.exe...
     powershell -Command "Invoke-WebRequest -Uri '%SEVENZIP_URL%' -OutFile '%TMP_DIR%\%SEVENZIP_EXE%'"
 )
 
 :: Step 2: Download mpv
-echo Downloading mpv build...
+echo 🔽 Downloading mpv build...
 powershell -Command "Invoke-WebRequest -Uri '%MPV_URL%' -OutFile '%MPV_ARCHIVE%'"
 
 :: Step 3: Extract
-echo Extracting mpv...
+echo 📦 Extracting mpv...
 "%TMP_DIR%\%SEVENZIP_EXE%" x "%MPV_ARCHIVE%" -o"%TMP_DIR%\%MPV_FOLDER%" -y >nul
 
 :: Step 4: Move to user folder
-echo Installing to %INSTALL_DIR%...
+echo 📁 Installing to %INSTALL_DIR%...
 rmdir /s /q "%INSTALL_DIR%" 2>nul
 move /y "%TMP_DIR%\%MPV_FOLDER%" "%INSTALL_DIR%" >nul
 
 :: Step 5: Add to user PATH
 set "NEWPATH=%INSTALL_DIR%"
+set "OLDPATH="
+
 for /f "tokens=2*" %%a in ('reg query HKCU\Environment /v PATH 2^>nul') do set "OLDPATH=%%b"
-echo %OLDPATH% | find /i "%NEWPATH%" >nul
-if %errorlevel% neq 0 (
-    echo Adding mpv to user PATH...
-    setx PATH "%OLDPATH%;%NEWPATH%"
-) else (
-    echo mpv is already in PATH.
+
+if not defined OLDPATH (
+    echo [WARN] Could not read PATH from registry. Using current session PATH.
+    set "OLDPATH=%PATH%"
 )
 
-echo Done. Open a new terminal to use mpv from anywhere.
+echo %OLDPATH% | find /i "%NEWPATH%" >nul
+if %errorlevel% neq 0 (
+    echo ➕ Adding mpv to user PATH...
+    setx PATH "%OLDPATH%;%NEWPATH%"
+) else (
+    echo ✅ mpv is already in PATH.
+)
+
+:: Step 6: Cleanup and debug info
+echo.
+echo ✅ Done! MPV installed to: %INSTALL_DIR%
+echo 🧠 You may need to log out and back in for the PATH to update everywhere.
+echo.
+echo 🧪 User PATH now includes:
+reg query HKCU\Environment /v PATH
+echo.
+
 pause
+
