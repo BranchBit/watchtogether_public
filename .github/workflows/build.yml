@@ -148,42 +148,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  deploy-to-public:
-    needs: release
+  release-public:
+    needs: [ build-linux, build-windows, build-macos, create-tag ]
     if: needs.create-tag.outputs.tag != ''
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
-      - name: Clone public repo
+      - name: Checkout private repo (source)
         uses: actions/checkout@v3
-        with:
-          repository: BranchBit/watchtogether_public
-          token: ${{ secrets.GH_TOKEN }}
-          path: public-repo
 
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
-          path: all-artifacts
+          path: artifacts
 
-      - name: Copy release files to public repo
-        run: |
-          tag=${{ needs.create-tag.outputs.tag }}
-          mkdir -p public-repo/releases/$tag
-          
-          # Copy only binaries (no source code)
-          find all-artifacts -type f \( \
-            -iname '*.exe' -o \
-            -iname '*.AppImage' -o \
-            -iname '*.dmg' -o \
-            -iname '*.zip' -o \
-            -iname '*.app' \
-          \) -exec cp {} public-repo/releases/$tag/ \;
-
-      - name: Commit and push artifacts
-        run: |
-          cd public-repo
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add .
-          git commit -m "Release ${{ needs.create-tag.outputs.tag }}"
-          git push origin main
+      - name: Create Release and upload assets to PUBLIC repo
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: BranchBit/watchtogether_public
+          tag_name: ${{ needs.create-tag.outputs.tag }}
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
