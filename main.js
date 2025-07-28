@@ -4,7 +4,9 @@ const { spawnTorrentServer } = require("./torrent-server");
 const WebSocket = require("ws");
 const localtunnel = require("localtunnel");
 const MPV = require("node-mpv");
-const { execFile } = require("child_process");
+const { execFile, spawn } = require("child_process");
+const fs = require("fs");
+const https = require("https");
 const os = require("os");
 
 function checkMPVInstalled() {
@@ -93,6 +95,67 @@ function createWindow() {
   win.loadFile("index.html");
 }
 
+async function downloadFile(url, dest) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(dest);
+    https.get(url, (response) => {
+      response.pipe(file);
+      file.on("finish", () => file.close(resolve));
+    }).on("error", (err) => {
+      fs.unlink(dest, () => reject(err));
+    });
+  });
+}
+
+function extractWith7z(archive, dest) {
+  return new Promise((resolve, reject) => {
+    const sevenZip = "7z";
+    const args = ["x", archive, `-o${dest}`, "-y"];
+    const proc = spawn(sevenZip, args);
+    proc.on("close", (code) => (code === 0 ? resolve() : reject(new Error("7z extraction failed"))));
+  });
+}
+
+async function attemptAutoInstallMPV() {
+  win = new BrowserWindow({
+    width: 600,
+    height: 400,
+    title: "Installing MPV...",
+    webPreferences: {
+      contextIsolation: false,
+      nodeIntegration: true,
+    },
+  });
+  win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
+    <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+      <h2>MPV Not Found</h2>
+      <p>Attempting to download and install MPV for Windows...</p>
+    </body>
+  `));
+
+  const MPV_URL = "https://github.com/zhongfly/mpv-winbuild/releases/download/2025-07-28-a6f3236/mpv-x86_64-20250728-git-a6f3236.7z";
+  const archivePath = path.join(app.getPath("temp"), "mpv.7z");
+  const extractDir = path.join(app.getPath("userData"), "mpv");
+
+  try {
+    await downloadFile(MPV_URL, archivePath);
+    await extractWith7z(archivePath, extractDir);
+    process.env.PATH = `${extractDir};${process.env.PATH}`;
+    await checkMPVInstalled();
+    win.close();
+    createWindow();
+  } catch (e) {
+    console.error("❌ MPV install failed:", e);
+    const message = getMPVErrorMessage("win32");
+    win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
+      <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+        ${message}
+        <p style="color:red;">Automatic install failed: ${e.message}</p>
+      </body>
+    `));
+  }
+}
+
 app.whenReady().then(async () => {
   try {
     await checkMPVInstalled();
@@ -100,30 +163,33 @@ app.whenReady().then(async () => {
   } catch (err) {
     console.error("❌", err.message);
     const platform = os.platform();
-    const message = getMPVErrorMessage(platform);
+    if (platform === "win32") {
+      await attemptAutoInstallMPV();
+    } else {
+      const message = getMPVErrorMessage(platform);
+      const errorWin = new BrowserWindow({
+        width: 600,
+        height: 400,
+        title: "MPV Player Not Found",
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        webPreferences: {
+          contextIsolation: false,
+          nodeIntegration: true,
+        },
+      });
 
-    const errorWin = new BrowserWindow({
-      width: 600,
-      height: 400,
-      title: "MPV Player Not Found",
-      resizable: false,
-      minimizable: false,
-      maximizable: false,
-      webPreferences: {
-        contextIsolation: false,
-        nodeIntegration: true,
-      },
-    });
+      errorWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
+        <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+          ${message}
+        </body>
+      `));
 
-    errorWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
-      <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
-        ${message}
-      </body>
-    `));
-
-    errorWin.on("closed", () => {
-      app.quit();
-    });
+      errorWin.on("closed", () => {
+        app.quit();
+      });
+    }
   }
 });
 
