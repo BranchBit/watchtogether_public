@@ -108,13 +108,14 @@ async function downloadFile(url, dest) {
 }
 
 function extractWith7z(archive, dest) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const isWin = os.platform() === "win32";
     const local7zrPath = path.join(app.getPath("userData"), "7zr.exe");
+    const logPath = path.join(app.getPath("userData"), "7z-extract-log.txt");
 
     function spawn7z(sevenZipPath) {
       if (!fs.existsSync(archive)) {
-        return reject(new Error(`Archive not found at: ${archive}`));
+        return reject(new Error(`Archive not found: ${archive}`));
       }
 
       if (!fs.existsSync(dest)) {
@@ -122,9 +123,11 @@ function extractWith7z(archive, dest) {
       }
 
       const args = ["x", archive, `-o${dest}`, "-y"];
+      const out = fs.openSync(logPath, 'w');
+
       const proc = spawn(sevenZipPath, args, {
         windowsHide: true,
-        stdio: "inherit", // helps debug
+        stdio: ['ignore', out, out], // redirect stdout/stderr to file
       });
 
       proc.on("error", (err) => {
@@ -132,10 +135,12 @@ function extractWith7z(archive, dest) {
       });
 
       proc.on("close", (code) => {
+        fs.closeSync(out);
         if (code === 0) {
           resolve();
         } else {
-          reject(new Error(`7z extraction failed (code ${code})`));
+          const output = fs.readFileSync(logPath, "utf8");
+          reject(new Error(`7z exited with code ${code}:\n\n${output}`));
         }
       });
     }
@@ -144,27 +149,12 @@ function extractWith7z(archive, dest) {
       return spawn7z(local7zrPath);
     }
 
-    const systemProc = spawn("7z", ["-h"]);
-    systemProc.on("error", async () => {
-      if (isWin) {
-        console.log("⬇️  Downloading portable 7zr.exe...");
-        try {
-          await downloadFile("https://www.7-zip.org/a/7zr.exe", local7zrPath);
-          console.log("✅  7zr.exe downloaded, extracting archive...");
-          spawn7z(local7zrPath);
-        } catch (downloadErr) {
-          reject(new Error("Failed to download 7zr.exe: " + downloadErr.message));
-        }
-      } else {
-        reject(new Error("7z is not available and platform is not Windows"));
-      }
-    });
-
-    systemProc.on("close", (code) => {
-      if (code === 0) {
-        spawn7z("7z");
-      }
-    });
+    try {
+      await downloadFile("https://www.7-zip.org/a/7zr.exe", local7zrPath);
+      spawn7z(local7zrPath);
+    } catch (err) {
+      reject(new Error("Failed to download 7zr.exe: " + err.message));
+    }
   });
 }
 
@@ -197,14 +187,20 @@ async function attemptAutoInstallMPV() {
     win.close();
     createWindow();
   } catch (e) {
-    console.error("❌ MPV install failed:", e);
-    const message = getMPVErrorMessage("win32");
+    const logPath = path.join(app.getPath("userData"), "7z-extract-log.txt");
+    let errorDetails = "";
+
+    if (fs.existsSync(logPath)) {
+      errorDetails = fs.readFileSync(logPath, "utf8").slice(0, 800); // max 800 chars
+    }
+
     win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
-      <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
-        ${message}
-        <p style="color:red;">Automatic install failed: ${e.message}</p>
-      </body>
-    `));
+  <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+    ${message}
+    <p style="color:red;">Automatic install failed: ${e.message}</p>
+    <pre style="max-height: 300px; overflow-y: auto; background:#222; color:#ccc; padding:10px;">${errorDetails}</pre>
+  </body>
+`));
   }
 }
 
