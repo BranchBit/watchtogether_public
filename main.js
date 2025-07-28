@@ -143,10 +143,40 @@ function createWindow() {
 }
 
 
+
 app.whenReady().then(async () => {
+  const platform = os.platform();
+  let installingWin = null;
+
   try {
-    const platform = os.platform();
     let mpvPath = "mpv";
+
+    if (platform === "win32") {
+      installingWin = new BrowserWindow({
+        width: 400,
+        height: 200,
+        frame: false,
+        resizable: false,
+        alwaysOnTop: true,
+        webPreferences: {
+          contextIsolation: false,
+          nodeIntegration: true,
+        },
+      });
+
+      installingWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
+        <body style='font-family:sans-serif;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;height:100%;'>
+          <h2>🔧 Installing MPV Player...</h2>
+        </body>
+      `));
+
+      mpvPath = await ensureMPVInstalled();
+    } else {
+      await checkMPVInstalled();
+    }
+
+    if (installingWin) installingWin.close();
+
     if (platform === "win32") {
       mpvPath = await ensureMPVInstalled();
     } else {
@@ -154,11 +184,20 @@ app.whenReady().then(async () => {
     }
 
     createWindow();
-  } catch (err) {
-    console.error("❌", err.message);
-    const platform = os.platform();
-    const message = getMPVErrorMessage(platform);
+  }
+} catch (err) {
+  console.error("❌", err.message);
+  const message = getMPVErrorMessage(platform);
 
+  if (installingWin) {
+    installingWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
+        <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+          ${message}
+        </body>
+      `));
+    installingWin.setSize(600, 400);
+    installingWin.center();
+  } else {
     const errorWin = new BrowserWindow({
       width: 600,
       height: 400,
@@ -173,15 +212,18 @@ app.whenReady().then(async () => {
     });
 
     errorWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`
-      <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
-        ${message}
-      </body>
-    `));
+        <body style="font-family:sans-serif;background:#111;color:#fff;padding:20px;">
+          ${message}
+        </body>
+      `));
 
     errorWin.on("closed", () => {
       app.quit();
     });
   }
+}
+);
+}
 });
 
 ipcMain.on("start-host", async (event, { magnetURI }) => {
