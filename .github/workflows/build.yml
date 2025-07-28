@@ -7,7 +7,7 @@ on:
 jobs:
   create-tag:
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.message, 'tag')
+    if: contains(github.event.head_commit.message, 'tagrelease')
     permissions:
       contents: write
     outputs:
