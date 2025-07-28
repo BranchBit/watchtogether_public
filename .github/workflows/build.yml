@@ -154,27 +154,43 @@ jobs:
             dist/*.dmg
             dist/*.app
 
-  release-public:
-    needs: [build-linux, build-windows, build-macos, create-tag]
+  release-private:
+    needs: [ build-linux, build-windows, build-macos, create-tag ]
     if: needs.create-tag.outputs.tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
-      - name: Checkout private repo (source)
-        uses: actions/checkout@v3
-
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Create Release and upload assets to PUBLIC repo
+      - name: Create Release and upload assets to PRIVATE repo
         uses: softprops/action-gh-release@v2
         with:
-          repository: BranchBit/watchtogether_public
           tag_name: ${{ needs.create-tag.outputs.tag }}
           files: artifacts/**/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    release-public:
+      needs: release-private
+      if: needs.create-tag.outputs.tag != ''
+      runs-on: ubuntu-latest
+      permissions:
+        contents: write
+      steps:
+        - name: Download all build artifacts
+          uses: actions/download-artifact@v4
+          with:
+            path: artifacts
+
+        - name: Create Release and upload assets to PUBLIC repo
+          uses: softprops/action-gh-release@v2
+          with:
+            repository: BranchBit/watchtogether_public
+            tag_name: ${{ needs.create-tag.outputs.tag }}
+            files: artifacts/**/*
+          env:
+            GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
