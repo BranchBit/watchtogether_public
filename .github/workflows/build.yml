@@ -176,7 +176,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-public:
-    needs: release-private
+    needs: [release-private, create-tag]
     runs-on: ubuntu-latest
     permissions:
       contents: write
