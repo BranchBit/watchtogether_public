@@ -10,17 +10,29 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Electron build output
+# Electron build
 dist/
 build/
-out/
 release/
-*.app
+out/
+
+# Electron packaged apps
 *.exe
 *.dmg
+*.AppImage
 *.zip
+*.deb
+*.rpm
 
-# OS specific
+# Project specific
+assets/binaries/
+*.mp4
+*.mkv
+*.avi
+*.mpv
+*.vlc
+
+# OS generated files
 .DS_Store
 .DS_Store?
 ._*
@@ -34,6 +46,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
-*.swn
 .env
-*.env.*
+.env.*
+*~

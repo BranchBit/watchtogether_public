@@ -10,7 +10,7 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 
 const macOsGuidInstalledPath = "/Applications/mpv.app/Contents/MacOS/mpv";
-
+const winGuidInstalledPath = `C:/Users/${os.userInfo().username}/mpv`;
 function checkMPVInstalled() {
   return new Promise((resolve, reject) => {
     execFile("mpv", ["--version"], (error) => {
@@ -22,7 +22,14 @@ function checkMPVInstalled() {
           if (fs.existsSync(macOsGuidInstalledPath)) {
             resolve(true);
           }
-        } else {
+        } else if (
+            os.platform() === "win32" &&
+            fs.existsSync(macOsGuidInstalledPath)
+        ) {
+          if (fs.existsSync(macOsGuidInstalledPath)) {
+            resolve(true);
+          }
+        } else  {
           reject(new Error("MPV is not installed or not in PATH"));
         }
       } else {
@@ -351,6 +358,10 @@ function broadcastSync(payload) {
 }
 
 function checkPath() {
+  if (os.platform() && fs.existsSync(macOsGuidInstalledPath)) {
+    return macOsGuidInstalledPath;
+  }
+
   if (os.platform() && fs.existsSync(macOsGuidInstalledPath)) {
     return macOsGuidInstalledPath;
   }
