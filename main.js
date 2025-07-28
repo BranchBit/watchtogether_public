@@ -117,8 +117,13 @@ app.whenReady().then(async () => {
       },
     });
 
-    ipcMain.handle("install-mpv", async (event) => {
-      const batPath = path.join(__dirname, "assets", "install-mpv.bat");
+    ipcMain.handle("install-mpv", async () => {
+      const batPath = path.join(process.resourcesPath, "install-mpv.bat");
+
+      if (!fs.existsSync(batPath)) {
+        errorWin.webContents.send("installer-log", "ERROR: install-mpv.bat not found.\n");
+        return;
+      }
 
       const proc = spawn("cmd.exe", ["/c", batPath]);
 
@@ -131,7 +136,10 @@ app.whenReady().then(async () => {
       });
 
       proc.on("exit", (code) => {
-        errorWin.webContents.send("installer-log", `\nInstaller exited with code ${code}\nRestart the app to try again.`);
+        errorWin.webContents.send(
+            "installer-log",
+            `\nInstaller exited with code ${code}\nRestart the app to try again.`,
+        );
       });
     });
 
