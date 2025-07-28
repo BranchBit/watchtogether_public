@@ -8,7 +8,7 @@ A cross-platform app to watch videos together with friends in real-time.
 
 ### Installation
 - Download the latest `.exe` from the [Releases](https://github.com/branchbit/watchtogether_public/releases).
-- Run the installer or executable file.
+- Run the executable file.
 - Follow the on-screen instructions to set up.
 
 ### Notes
@@ -32,7 +32,7 @@ A cross-platform app to watch videos together with friends in real-time.
 ## 🐧 Linux
 
 ### Installation
-- Download the appropriate `.AppImage` or `.tar.gz` from the [Releases](https://github.com/branchbit/watchtogether_public/releases).
+- Download the appropriate `.AppImage` from the [Releases](https://github.com/branchbit/watchtogether_public/releases).
 - Make it executable:
   ```bash
   chmod +x watchtogether_public.AppImage
