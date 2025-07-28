@@ -185,29 +185,22 @@ jobs:
       TAG: ${{ needs.create-tag.outputs.tag }}
 
     steps:
-      - name: Clone private repo
+      - name: Clone private repo fully
         run: |
-          # Clone the private repo shallowly
-          git clone --no-checkout --depth=1 --filter=blob:none --branch main https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/BranchBit/watchtogether.git private
+          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/BranchBit/watchtogether.git private
           cd private
 
-          # Fetch the tag that was created
+          # Fetch the tag explicitly (in case not cloned by default)
           git fetch origin refs/tags/${TAG}:refs/tags/${TAG}
 
-          # Add the public repo as a new remote
+          # Add the public repo as a remote
           git remote add public https://x-access-token:${GH_TOKEN}@github.com/BranchBit/watchtogether_public.git
 
-          # Get the commit the tag points to
+          # Push the tag and the commit it points to
           commit=$(git rev-list -n 1 ${TAG})
-
-          # Create a temp branch at that commit
           git branch temp-release $commit
-
-          # Push just the commit and the tag to the public repo
           git push public temp-release:refs/heads/temp-release
           git push public refs/tags/${TAG}
-
-          # Clean up local branch
           git branch -D temp-release
 
       - name: Download artifacts
@@ -223,3 +216,4 @@ jobs:
           files: artifacts/**/*.*
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+  
