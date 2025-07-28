@@ -27,8 +27,7 @@ function getMPVErrorMessage(platform) {
         <p>This app needs MPV media player installed and available in your PATH.</p>
         <p><strong>Recommended:</strong></p>
         <ul>
-          <li><a href="https://github.com/stax76/mpv.net/releases/latest" style="color:#8f8;" target="_blank">Download mpv.net (GUI version)</a></li>
-          <li>Or: <a href="https://github.com/zhongfly/mpv-winbuild/releases/latest" style="color:#8f8;" target="_blank">Download mpv-winbuild (raw binaries)</a></li>
+          <li><a href="https://github.com/zhongfly/mpv-winbuild/releases/download/2025-07-28-a6f3236/mpv-x86_64-20250728-git-a6f3236.7z" style="color:#8f8;" target="_blank">Download mpv-winbuild, unzip and run installer</a></li>
         </ul>
         <p>After installing, restart this app.</p>
       `;
