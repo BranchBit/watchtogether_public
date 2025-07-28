@@ -1,4 +1,4 @@
-# watchtogether_public
+# Watchtogether
 
 A cross-platform app to watch videos together with friends in real-time.
 
