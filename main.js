@@ -53,35 +53,30 @@ function showError(htmlMessage) {
   `));
 }
 
-function downloadFile(url, dest, maxRedirects = 5) {
+function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
-    const doRequest = (urlToFetch, redirectCount) => {
-      if (redirectCount > maxRedirects) {
-        return reject(new Error("Too many redirects"));
+    const curl = spawn("curl", ["-L", "-A", "ElectronApp/1.0", "-o", dest, url]);
+
+    curl.on("error", (err) => reject(new Error(`curl not found or failed: ${err.message}`)));
+
+    curl.on("close", (code) => {
+      if (code === 0 && fs.existsSync(dest)) {
+        setTimeout(() => {
+          const size = fs.statSync(dest).size;
+          if (size < 1_000_000) {
+            const html = fs.readFileSync(dest, "utf8");
+            if (html.includes("<html")) return reject(new Error("Downloaded HTML instead of .7z"));
+            return reject(new Error("Downloaded file is too small."));
+          }
+          resolve();
+        }, 500); // wait for Windows to unlock file
+      } else {
+        reject(new Error(`curl exited with code ${code}`));
       }
-
-      https.get(urlToFetch, {
-        headers: { "User-Agent": "ElectronApp/1.0" },
-      }, (res) => {
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          const redirectUrl = new URL(res.headers.location, urlToFetch).toString();
-          return doRequest(redirectUrl, redirectCount + 1);
-        }
-
-        if (res.statusCode !== 200) {
-          return reject(new Error(`Download failed. Status: ${res.statusCode}`));
-        }
-
-        const file = fs.createWriteStream(dest);
-        res.pipe(file);
-        file.on("finish", () => file.close(resolve));
-      }).on("error", (err) => {
-        reject(err);
-      });
-    };
-
-    doRequest(url, 0);
+    });
   });
+}
+});
 }
 
 function extractWith7z(archive, dest) {
@@ -91,7 +86,21 @@ function extractWith7z(archive, dest) {
 
     function spawn7z(sevenZipPath) {
       if (!fs.existsSync(archive)) return reject(new Error(`Missing archive: ${archive}`));
-      if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+
+      try {
+        fs.renameSync(archive, archive); // check file isn't locked
+      } catch (err) {
+        return reject(new Error("Cannot access archive: " + err.message));
+      }
+
+      if (fs.existsSync(dest)) {
+        try {
+          fs.rmSync(dest, { recursive: true, force: true });
+        } catch (e) {
+          return reject(new Error("Failed to clean extract folder: " + e.message));
+        }
+      }
+      fs.mkdirSync(dest, { recursive: true });
 
       const args = ["x", archive, `-o${dest}`, "-y"];
       const out = fs.openSync(logPath, 'w');
@@ -102,7 +111,8 @@ function extractWith7z(archive, dest) {
         fs.closeSync(out);
         if (code === 0) return resolve();
         const output = fs.readFileSync(logPath, "utf8");
-        reject(new Error(`7z exit code ${code}:\n${output}`));
+        reject(new Error(`7z exit code ${code}:
+${output}`));
       });
     }
 
@@ -114,6 +124,29 @@ function extractWith7z(archive, dest) {
       reject(new Error("Failed to get 7zr: " + err.message));
     }
   });
+};
+
+const args = ["x", archive, `-o${dest}`, "-y"];
+const out = fs.openSync(logPath, 'w');
+const proc = spawn(sevenZipPath, args, { windowsHide: true, stdio: ['ignore', out, out] });
+
+proc.on("error", err => reject(new Error(`Failed to launch 7z: ${err.message}`)));
+proc.on("close", code => {
+  fs.closeSync(out);
+  if (code === 0) return resolve();
+  const output = fs.readFileSync(logPath, "utf8");
+  reject(new Error(`7z exit code ${code}:\n${output}`));
+});
+}
+
+if (fs.existsSync(local7zrPath)) return spawn7z(local7zrPath);
+try {
+  await downloadFile("https://www.7-zip.org/a/7zr.exe", local7zrPath);
+  spawn7z(local7zrPath);
+} catch (err) {
+  reject(new Error("Failed to get 7zr: " + err.message));
+}
+});
 }
 
 app.whenReady().then(async () => {
@@ -165,6 +198,7 @@ function createWindow() {
   });
   win.loadFile("index.html");
 }
+
 
 function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
