@@ -33,24 +33,7 @@ echo 📁 Installing to %INSTALL_DIR%...
 rmdir /s /q "%INSTALL_DIR%" 2>nul
 move /y "%TMP_DIR%\%MPV_FOLDER%" "%INSTALL_DIR%" >nul
 
-:: Step 5: Add to user PATH
-set "NEWPATH=%INSTALL_DIR%"
-set "OLDPATH="
 
-:: for /f "tokens=2*" %%a in ('reg query HKCU\Environment /v PATH 2^>nul') do set "OLDPATH=%%b"
-
-if not defined OLDPATH (
-    echo [WARN] Could not read PATH from registry. Using current session PATH.
-    set "OLDPATH=%PATH%"
-)
-
-echo %OLDPATH% | find /i "%NEWPATH%" >nul
-if %errorlevel% neq 0 (
-    echo ➕ Adding mpv to user PATH...
-    :: setx PATH "%OLDPATH%;%NEWPATH%"
-) else (
-    echo ✅ mpv is already in PATH.
-)
 
 :: Step 6: Cleanup and debug info
 echo.
