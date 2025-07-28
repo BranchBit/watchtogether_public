@@ -228,19 +228,28 @@ jobs:
           # Fetch all tags (sorted newest first)
           TAGS=$(git tag --sort=-v:refname | grep '^v' | head -n 10)
 
-          # Build release list HTML
+          # Build release list HTML block
           LIST_HTML="<h3>Releases</h3><ul class='release-list'>"
           for TAG in $TAGS; do
             LIST_HTML+="<li><a href='https://github.com/BranchBit/watchtogether_public/releases/tag/$TAG'>$TAG</a></li>"
           done
           LIST_HTML+="</ul>"
 
-          # Insert the list into index.html (replace placeholder comment)
-          sed -i '/<!--RELEASE-LIST-->/c\'"$LIST_HTML" index.html
+          # Save to a temp file
+          echo "$LIST_HTML" > /tmp/releases.html
 
-          # Push the updated index.html
+          # Replace placeholder in index.html
+          sed -i '/<!--RELEASE-LIST-->/r /tmp/releases.html' index.html
+          sed -i '/<!--RELEASE-LIST-->/d' index.html
+
+          # Only commit if there are changes
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add index.html
-          git commit -m "Update GitHub Pages with latest release list"
-          git push origin main
+          if ! git diff --quiet; then
+            git add index.html
+            git commit -m "Update GitHub Pages with latest release list"
+            git push origin main
+          else
+            echo "No changes to commit."
+          fi
+      
