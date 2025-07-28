@@ -177,43 +177,43 @@ jobs:
 
   release-public:
     needs: release-private
-    if: needs.create-tag.outputs.tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      TAG: ${{ needs.create-tag.outputs.tag }}
+
     steps:
-      - name: Download all build artifacts
+      - name: Checkout private repo
+        uses: actions/checkout@v3
+
+      - name: Push tag and commit to public repo (no source)
+        run: |
+          mkdir public-mirror
+          cd public-mirror
+          git init
+          git remote add origin https://x-access-token:${GH_TOKEN}@github.com/BranchBit/watchtogether_public.git
+
+          # Pull commit/tag from private repo
+          git fetch --depth=1 origin $TAG
+
+          # Mirror the tag/commit only
+          git push origin "refs/tags/$TAG"
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Push tag to public repo
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          TAG: ${{ needs.create-tag.outputs.tag }}
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git clone https://x-access-token:${GH_TOKEN}@github.com/BranchBit/watchtogether_public.git
-          cd watchtogether_public
-          git fetch --tags
-          echo "Existing tags:"
-          git tag --list
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists in public repo, force updating it."
-            git tag -f $TAG
-            git push -f origin $TAG
-          else
-            echo "Creating and pushing new tag $TAG"
-            git tag $TAG
-            git push origin $TAG
-          fi
-
-      - name: Create Release and upload assets to PUBLIC repo
+      - name: Create GitHub Release in public repo
         uses: softprops/action-gh-release@v2
         with:
           repository: BranchBit/watchtogether_public
-          tag_name: ${{ needs.create-tag.outputs.tag }}
-          files: artifacts/**/*
+          tag_name: ${{ env.TAG }}
+          files: artifacts/**/*.*
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+  
