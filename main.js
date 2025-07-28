@@ -136,7 +136,7 @@ app.whenReady().then(async () => {
     });
 
     errorWin.loadFile("mpv-error.html");
-
+    errorWin.webContents.openDevTools();
 
     errorWin.on("closed", () => {
       app.quit();
