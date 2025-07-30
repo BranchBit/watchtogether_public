@@ -120,6 +120,22 @@
         text-decoration: none;
         font-weight: bold;
       }
+      .content-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 40px;
+      }
+      
+      .main-text {
+        flex: 2 1 500px;
+        text-align: left;
+      }
+      
+      .release-column {
+        flex: 1 1 200px;
+        text-align: left;
+      }
     </style>
   </head>
 
@@ -139,25 +155,31 @@
     </section>
 
     <section class="main-content">
-      <p><strong>Watchtogether</strong> lets you host or join a video session, synced via WebSockets and secure tunnels.</p>
-      <p>Just paste a magnet link, share the invite code, and enjoy streaming together in real time.</p>
-      <p>No accounts. No cloud processing. Just local sync and private streaming.</p>
+    <div class="content-container">
+      <div class="main-text">
+        <p><strong>Watchtogether</strong> lets you host or join a video session, synced via WebSockets and secure tunnels.</p>
+        <p>Just paste a magnet link, share the invite code, and enjoy streaming together in real time.</p>
+        <p>No accounts. No cloud processing. Just local sync and private streaming.</p>
+  
+        <ul class="features">
+          <li>🔗 Supports direct magnet links</li>
+          <li>🛰️ Works through secure localtunnel connections</li>
+          <li>🎥 Plays via MPV media player</li>
+          <li>👥 Syncs video time across users with WebSockets</li>
+          <li>🧊 Fully supports MKV and subtitles</li>
+        </ul>
+      </div>
+  
+      <div class="release-column">
+        <h3>Releases</h3>
+        <ul class="release-list">
+          <li><a href="https://github.com/BranchBit/watchtogether_public/releases/tag/v1.0.78">v1.0.78</a></li>
+          <li><a href="https://github.com/BranchBit/watchtogether_public/releases/tag/v1.0.76">v1.0.76</a></li>
+        </ul>
+      </div>
+    </div>
+  </section>
 
-      <ul class="features">
-        <li>🔗 Supports direct magnet links</li>
-        <li>🛰️ Works through secure localtunnel connections</li>
-        <li>🎥 Plays via MPV media player</li>
-        <li>👥 Syncs video time across users with WebSockets</li>
-        <li>🧊 Fully supports MKV and subtitles</li>
-      </ul>
-
-      <h3>Releases</h3>
-      <ul class="release-list">
-        <!--RELEASE-LIST-->
-        <li><a href="https://github.com/BranchBit/watchtogether_public/releases/tag/v1.0.78">v1.0.78</a></li>
-        <li><a href="https://github.com/BranchBit/watchtogether_public/releases/tag/v1.0.76">v1.0.76</a></li>
-      </ul>
-    </section>
 
     <footer class="site-footer">
       <center>
