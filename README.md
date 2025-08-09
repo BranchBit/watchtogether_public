@@ -9,9 +9,8 @@ More info can be found [Here](https://branchbit.github.io/watchtogether_public/)
 ## 🖥 Windows
 
 ### Installation
-- Download the latest `.exe` from the [Releases](https://github.com/branchbit/watchtogether_public/releases).
-- Run the executable file.
-- Follow the on-screen instructions to set up.
+- Download the latest windows zip from [Releases](https://github.com/branchbit/watchtogether_public/releases).
+- Extract the zip and run the `.exe` file.
 
 ### Notes
 - Windows Defender may warn you — click **More Info > Run anyway**.
