@@ -38,3 +38,11 @@ More info can be found [Here](https://branchbit.github.io/watchtogether_public/)
   ```bash
   chmod +x watchtogether_public.AppImage
   ./watchtogether_public.AppImage
+
+
+---
+PLANNED:
+- Textchat
+- Resume playback where previously ended off
+- Choose subtitle language
+- Control subtitle delays
