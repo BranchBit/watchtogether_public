@@ -45,6 +45,7 @@ More info can be found [Here](https://branchbit.github.io/watchtogether_public/)
 
 ---
 PLANNED:
+- Socket connection indicator during playing in client
 - Textchat
 - Resume playback where previously ended off
 - Choose subtitle language
